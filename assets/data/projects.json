@@ -1,0 +1,238 @@
+[
+  {
+    "id": "portal-corporativo",
+    "title": "Portal Corporativo Multiempresa",
+    "category": "portais",
+    "categoryLabel": "Portal",
+    "year": "2025",
+    "badge": "Enterprise",
+    "client": "Grupo industrial · 8 unidades",
+    "summary": "Portal unificado com áreas por perfil, SSO e painel de indicadores em tempo real para um grupo com 8 unidades.",
+    "challenge": "O grupo operava com 8 intranets separadas, logins duplicados e informação espalhada. Comunicados críticos não chegavam ao chão de fábrica e a TI gastava horas com reset de senhas.",
+    "solution": "Projetamos um portal único com SSO via Azure AD, áreas segmentadas por perfil (diretoria, RH, operação) e um painel de indicadores em tempo real integrado ao ERP. Migração faseada, sem parada.",
+    "results": [
+      {
+        "num": "8→1",
+        "label": "intranets unificadas"
+      },
+      {
+        "num": "-72%",
+        "label": "chamados de acesso"
+      },
+      {
+        "num": "96%",
+        "label": "adoção em 3 meses"
+      }
+    ],
+    "features": [
+      "Single Sign-On (Azure AD)",
+      "Painel de KPIs em tempo real",
+      "Gestão de comunicados por unidade",
+      "Diretório de pessoas e áreas",
+      "Workflow de aprovações"
+    ],
+    "stack": [
+      "Next.js",
+      "Node",
+      "PostgreSQL",
+      "Azure AD"
+    ],
+    "image": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=70"
+  },
+  {
+    "id": "saas-analytics",
+    "title": "SaaS de Analytics B2B",
+    "category": "saas",
+    "categoryLabel": "SaaS",
+    "year": "2024",
+    "badge": "Produto",
+    "client": "Startup de dados · B2B",
+    "summary": "Plataforma multi-tenant de métricas com billing recorrente, dashboards customizáveis e API pública.",
+    "challenge": "A startup validou a ideia em planilhas, mas precisava virar produto: multi-tenant de verdade, cobrança recorrente e uma API que aguentasse clientes enterprise — em 4 meses.",
+    "solution": "Arquitetura multi-tenant com isolamento por schema, billing via Stripe (upgrade/downgrade automático), dashboards drag-and-drop e API pública versionada com rate limiting. MVP em produção no prazo.",
+    "results": [
+      {
+        "num": "4 meses",
+        "label": "da ideia ao MVP pago"
+      },
+      {
+        "num": "99,9%",
+        "label": "de uptime no 1º ano"
+      },
+      {
+        "num": "+40",
+        "label": "clientes B2B ativos"
+      }
+    ],
+    "features": [
+      "Multi-tenant com isolamento",
+      "Billing recorrente (Stripe)",
+      "Dashboards customizáveis",
+      "API pública com rate limit",
+      "Onboarding self-service"
+    ],
+    "stack": [
+      "React",
+      "TypeScript",
+      "Nest",
+      "Stripe"
+    ],
+    "image": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=70"
+  },
+  {
+    "id": "app-delivery",
+    "title": "App de Delivery Regional",
+    "category": "apps",
+    "categoryLabel": "Aplicativo",
+    "year": "2024",
+    "badge": "iOS · Android",
+    "client": "Rede regional de restaurantes",
+    "summary": "Aplicativo com rastreio em tempo real, pagamento integrado e painel do lojista. Publicado nas duas lojas.",
+    "challenge": "A rede pagava taxas altíssimas aos marketplaces e não tinha relação direta com o cliente. Precisava de app próprio com rastreio e pagamento — sem equipe interna de tecnologia.",
+    "solution": "App multiplataforma (React Native) com rastreio em tempo real no mapa, pagamento in-app, push de promoções e um painel web para os lojistas gerirem cardápio e pedidos. Publicação assistida nas duas lojas.",
+    "results": [
+      {
+        "num": "-23%",
+        "label": "de custo por pedido"
+      },
+      {
+        "num": "4,8★",
+        "label": "média nas lojas"
+      },
+      {
+        "num": "60 mil",
+        "label": "pedidos no 1º ano"
+      }
+    ],
+    "features": [
+      "Rastreio em tempo real",
+      "Pagamento integrado",
+      "Push segmentado",
+      "Painel do lojista",
+      "Programa de fidelidade"
+    ],
+    "stack": [
+      "React Native",
+      "Firebase",
+      "Maps"
+    ],
+    "image": "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=1200&q=70"
+  },
+  {
+    "id": "site-institucional",
+    "title": "Site Institucional Premium",
+    "category": "sites",
+    "categoryLabel": "Site",
+    "year": "2025",
+    "badge": "Awwwards-ready",
+    "client": "Indústria de médio porte",
+    "summary": "Site de alta performance com animações leves, SEO técnico e 100/100 no Lighthouse para uma indústria.",
+    "challenge": "O site antigo demorava 9 segundos para carregar, não aparecia no Google e passava uma imagem defasada para um mercado que compra por licitação e reputação.",
+    "solution": "Redesign completo com identidade forte, animações leves, SEO técnico de ponta (Schema.org, Core Web Vitals) e arquitetura estática ultrarrápida. Conteúdo reescrito com foco em autoridade.",
+    "results": [
+      {
+        "num": "100/100",
+        "label": "Lighthouse performance"
+      },
+      {
+        "num": "+180%",
+        "label": "tráfego orgânico em 6 meses"
+      },
+      {
+        "num": "0,8s",
+        "label": "tempo de carregamento"
+      }
+    ],
+    "features": [
+      "Design exclusivo",
+      "SEO técnico completo",
+      "Animações leves",
+      "CMS para conteúdo",
+      "Multilíngue PT/EN"
+    ],
+    "stack": [
+      "Astro",
+      "GSAP",
+      "SEO"
+    ],
+    "image": "https://images.unsplash.com/photo-1467232004584-a241de8bcf5d?auto=format&fit=crop&w=1200&q=70"
+  },
+  {
+    "id": "ecommerce-headless",
+    "title": "E-commerce Headless",
+    "category": "sites",
+    "categoryLabel": "E-commerce",
+    "year": "2023",
+    "badge": "Alta conversão",
+    "client": "Varejo de nicho · nacional",
+    "summary": "Loja headless com checkout otimizado, integração ERP e reduções de tempo de carregamento acima de 60%.",
+    "challenge": "A loja na plataforma tradicional travava nas campanhas, o checkout perdia clientes no mobile e o estoque vivia dessincronizado do ERP.",
+    "solution": "Migração para arquitetura headless: front ultrarrápido, checkout de uma etapa otimizado para mobile e sincronização bidirecional com o ERP em tempo quase real.",
+    "results": [
+      {
+        "num": "-63%",
+        "label": "tempo de carregamento"
+      },
+      {
+        "num": "+31%",
+        "label": "conversão no mobile"
+      },
+      {
+        "num": "0",
+        "label": "quedas em campanhas"
+      }
+    ],
+    "features": [
+      "Front headless ultrarrápido",
+      "Checkout em 1 etapa",
+      "Integração ERP bidirecional",
+      "Busca inteligente",
+      "Recuperação de carrinho"
+    ],
+    "stack": [
+      "Next.js",
+      "Shopify",
+      "Vercel"
+    ],
+    "image": "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1200&q=70"
+  },
+  {
+    "id": "sistema-intranet",
+    "title": "Sistema de Gestão + Intranet",
+    "category": "portais",
+    "categoryLabel": "Sistema",
+    "year": "2023",
+    "badge": "On-premise",
+    "client": "Empresa de serviços · 300 colaboradores",
+    "summary": "ERP interno com controle de acessos, fluxo de aprovações e relatórios — substituiu 3 planilhas críticas.",
+    "challenge": "Três planilhas gigantes controlavam compras, férias e reembolsos. Erros de versão geravam retrabalho, e nada tinha trilha de auditoria.",
+    "solution": "Sistema web on-premise com fluxos de aprovação configuráveis, perfis de acesso, trilha de auditoria completa e relatórios gerenciais. Treinamento e migração de dados inclusos.",
+    "results": [
+      {
+        "num": "3→0",
+        "label": "planilhas críticas"
+      },
+      {
+        "num": "-85%",
+        "label": "tempo de aprovação"
+      },
+      {
+        "num": "100%",
+        "label": "auditável"
+      }
+    ],
+    "features": [
+      "Workflows de aprovação",
+      "Perfis e permissões",
+      "Trilha de auditoria",
+      "Relatórios gerenciais",
+      "Hospedado na infra do cliente"
+    ],
+    "stack": [
+      "Laravel",
+      "Vue",
+      "MySQL"
+    ],
+    "image": "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1200&q=70"
+  }
+]

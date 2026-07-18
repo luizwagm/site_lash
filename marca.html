@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08080c">
+  <meta name="color-scheme" content="dark">
+  <meta name="robots" content="noindex">
+  <title>Brand Guide — LA Software House</title>
+  <link rel="icon" href="assets/img/favicon-pilares.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <style>
+    .bg-wrap { padding-block: var(--sp-2xl); }
+    .bcard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-xl); display: grid; place-items: center; min-height: 200px; }
+    .bcard--light { background: #f4f5fb; }
+    .bcard--grad { background: linear-gradient(120deg, var(--violet), var(--cyan)); }
+    .blabel { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); margin-top: var(--sp-sm); text-align: center; }
+    .swatch { border-radius: var(--r-md); border: 1px solid var(--line); overflow: hidden; }
+    .swatch__chip { height: 90px; }
+    .swatch__info { padding: 0.7rem 0.9rem; background: var(--surface); }
+    .swatch__name { font-weight: 600; font-size: 0.85rem; }
+    .swatch__hex { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted); }
+    .type-row { padding: var(--sp-lg) 0; border-bottom: 1px solid var(--line); }
+    .type-row:last-child { border-bottom: 0; }
+    .type-meta { font-family: var(--font-mono); font-size: 0.75rem; color: var(--cyan); letter-spacing: 0.08em; }
+    .fav-row { display: flex; align-items: flex-end; gap: var(--sp-lg); flex-wrap: wrap; }
+    .fav { display: grid; place-items: center; gap: 8px; }
+    .fav__tab { background: var(--bg-800); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+    .concept-num { font-family: var(--font-mono); color: var(--violet); font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <a class="brand" href="index.html"><img class="brand__logo" src="assets/img/logo-pilares.svg" width="296" height="62" alt="LA Software House"></a>
+      <div class="header__actions"><a class="btn btn--ghost btn--sm" href="index.html">← Voltar ao site</a></div>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- HERO -->
+    <section class="hero" style="padding-block:var(--sp-2xl)">
+      <div class="hero__grid-bg" aria-hidden="true"></div>
+      <div class="container" style="text-align:center">
+        <p class="eyebrow" style="justify-content:center">Identidade Visual</p>
+        <h1 style="font-size:var(--step-4)">Brand Guide <span class="gradient-text">LA</span></h1>
+        <p class="section__lead" style="margin-inline:auto;max-width:52ch">A marca completa: símbolo, variações, cores, tipografia e o mascote. Tudo desenhado sob medida.</p>
+      </div>
+    </section>
+
+    <!-- EXPLORAÇÃO: DOIS CONCEITOS -->
+    <section class="section section--tight" style="padding-top:0">
+      <div class="container">
+        <div class="section__head"><p class="eyebrow">Exploração de conceito</p><h2 class="section__title">Escolha o caminho da marca.</h2>
+        <p class="section__lead">Dois conceitos finalistas, mesma paleta e personalidade — simbologias diferentes.</p></div>
+        <div class="grid grid--2">
+          <div>
+            <div class="bcard" style="min-height:240px;flex-direction:column;gap:18px;display:flex;align-items:center;justify-content:center">
+              <img src="assets/img/logo-horizontal.svg" width="300" alt="Conceito A — L dentro do A">
+              <img src="assets/img/favicon.svg" width="56" height="56" alt="Favicon conceito A">
+            </div>
+            <p class="blabel"><span class="concept-num">CONCEITO A</span> · "L dentro do A" — chevrons concêntricos, o L mora no A</p>
+          </div>
+          <div>
+            <div class="bcard" style="min-height:240px;flex-direction:column;gap:18px;display:flex;align-items:center;justify-content:center">
+              <img src="assets/img/logo-pilares.svg" width="300" alt="Conceito B — Pilares">
+              <img src="assets/img/favicon-pilares.svg" width="56" height="56" alt="Favicon conceito B">
+            </div>
+            <p class="blabel"><span class="concept-num">CONCEITO B</span> · "Pilares" — o L é a fundação, os pilares constroem o skyline em A</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SÍMBOLO + CONCEITO -->
+    <section class="section section--tight">
+      <div class="container split" style="align-items:center">
+        <div class="bcard" style="min-height:320px">
+          <img src="assets/img/favicon-pilares.svg" width="250" height="250" alt="Símbolo LA — Pilares">
+        </div>
+        <div>
+          <p class="eyebrow">O símbolo</p>
+          <h2 class="section__title">Fundação + construção = <span class="gradient-text">LA</span>.</h2>
+          <p class="section__lead">Uma cena, não um clipart: uma cidade de software erguendo-se numa noite de nébula.</p>
+          <ul class="list-check" role="list" style="margin-top:var(--sp-lg)">
+            <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> O <b>"L" branco</b> é o primeiro pilar + a fundação — 15 anos de alicerce</li>
+            <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Os <b>pilares em gradiente</b> traçam o skyline em "A" — prédios, gráfico de crescimento e equalizer digital, tudo ao mesmo tempo</li>
+            <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> <b>Profundidade real</b>: camada de torres distantes, luz vinda do spark, arestas iluminadas e reflexo na base</li>
+            <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> O <b>spark</b> coroa o pilar mais alto — o momento do deploy</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- VARIAÇÕES -->
+    <section class="section section--tight">
+      <div class="container">
+        <div class="section__head"><p class="eyebrow">Variações</p><h2 class="section__title">Uma marca para qualquer fundo.</h2></div>
+        <div class="grid grid--4">
+          <div><div class="bcard"><img src="assets/img/logo-pilares.svg" width="180" alt="Logo principal"></div><p class="blabel">Principal · fundo escuro</p></div>
+          <div><div class="bcard bcard--light"><img src="assets/img/logo-pilares.svg" width="180" alt="Logo em fundo claro"></div><p class="blabel">Fundo claro (chip protege)</p></div>
+          <div><div class="bcard" style="color:#fff"><svg viewBox="0 0 100 100" width="96" height="96" fill="currentColor"><rect x="17" y="42" width="10" height="34" rx="4.5"/><rect x="17" y="74" width="66" height="8" rx="4"/><rect x="33" y="50" width="10" height="24" rx="4.5"/><rect x="47" y="21" width="10" height="53" rx="4.5"/><rect x="61" y="38" width="10" height="36" rx="4.5"/><rect x="75" y="55" width="8" height="19" rx="4"/><path d="M52 4 L54.7 10.4 L61 13 L54.7 15.6 L52 22 L49.3 15.6 L43 13 L49.3 10.4 Z"/></svg></div><p class="blabel">Monocromático branco</p></div>
+          <div><div class="bcard bcard--light" style="color:#0d0d14"><svg viewBox="0 0 100 100" width="96" height="96" fill="currentColor"><rect x="17" y="42" width="10" height="34" rx="4.5"/><rect x="17" y="74" width="66" height="8" rx="4"/><rect x="33" y="50" width="10" height="24" rx="4.5"/><rect x="47" y="21" width="10" height="53" rx="4.5"/><rect x="61" y="38" width="10" height="36" rx="4.5"/><rect x="75" y="55" width="8" height="19" rx="4"/><path d="M52 4 L54.7 10.4 L61 13 L54.7 15.6 L52 22 L49.3 15.6 L43 13 L49.3 10.4 Z"/></svg></div><p class="blabel">Monocromático preto</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CORES -->
+    <section class="section section--tight">
+      <div class="container">
+        <div class="section__head"><p class="eyebrow">Paleta</p><h2 class="section__title">Cores da marca.</h2></div>
+        <div class="grid grid--4">
+          <div class="swatch"><div class="swatch__chip" style="background:#08080c"></div><div class="swatch__info"><div class="swatch__name">Void</div><div class="swatch__hex">#08080C</div></div></div>
+          <div class="swatch"><div class="swatch__chip" style="background:#14141f"></div><div class="swatch__info"><div class="swatch__name">Surface</div><div class="swatch__hex">#14141F</div></div></div>
+          <div class="swatch"><div class="swatch__chip" style="background:#7c5cff"></div><div class="swatch__info"><div class="swatch__name">Violet</div><div class="swatch__hex">#7C5CFF</div></div></div>
+          <div class="swatch"><div class="swatch__chip" style="background:#24e3d6"></div><div class="swatch__info"><div class="swatch__name">Cyan</div><div class="swatch__hex">#24E3D6</div></div></div>
+          <div class="swatch"><div class="swatch__chip" style="background:#e05cff"></div><div class="swatch__info"><div class="swatch__name">Fuchsia</div><div class="swatch__hex">#E05CFF</div></div></div>
+          <div class="swatch"><div class="swatch__chip" style="background:linear-gradient(120deg,#7c5cff,#24e3d6)"></div><div class="swatch__info"><div class="swatch__name">Gradiente</div><div class="swatch__hex">Violet → Cyan</div></div></div>
+          <div class="swatch"><div class="swatch__chip" style="background:#f3f4fb"></div><div class="swatch__info"><div class="swatch__name">Light</div><div class="swatch__hex">#F3F4FB</div></div></div>
+          <div class="swatch"><div class="swatch__chip" style="background:#9a9db1"></div><div class="swatch__info"><div class="swatch__name">Muted</div><div class="swatch__hex">#9A9DB1</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TIPOGRAFIA -->
+    <section class="section section--tight">
+      <div class="container">
+        <div class="section__head"><p class="eyebrow">Tipografia</p><h2 class="section__title">O sistema tipográfico.</h2></div>
+        <div class="bcard" style="display:block;text-align:left;padding:var(--sp-xl)">
+          <div class="type-row">
+            <p class="type-meta">SPACE GROTESK · Títulos</p>
+            <p style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(2rem,6vw,3.5rem);letter-spacing:-0.02em;margin-top:.4rem">Ideias viram software.</p>
+          </div>
+          <div class="type-row">
+            <p class="type-meta">INTER · Corpo de texto</p>
+            <p style="font-family:'Inter',sans-serif;font-size:1.15rem;color:var(--text-muted);margin-top:.4rem">Do primeiro rascunho ao deploy em produção, com performance, segurança e SEO como padrão. Aa Bb Cc 0123456789</p>
+          </div>
+          <div class="type-row">
+            <p class="type-meta">JETBRAINS MONO · Detalhes técnicos</p>
+            <p style="font-family:'JetBrains Mono',monospace;font-size:1rem;color:var(--cyan);margin-top:.4rem">const build = () => deploy(idea); // 15 anos</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAVICON -->
+    <section class="section section--tight">
+      <div class="container">
+        <div class="section__head"><p class="eyebrow">Ícone do app / aba</p><h2 class="section__title">Favicon em qualquer tamanho.</h2></div>
+        <div class="bcard" style="display:block">
+          <div class="fav-row">
+            <div class="fav"><span class="fav__tab"><img src="assets/img/favicon-pilares.svg" width="16" height="16" alt="16px"></span><span class="blabel">16px</span></div>
+            <div class="fav"><span class="fav__tab"><img src="assets/img/favicon-pilares.svg" width="32" height="32" alt="32px"></span><span class="blabel">32px</span></div>
+            <div class="fav"><span class="fav__tab"><img src="assets/img/favicon-pilares.svg" width="48" height="48" alt="48px"></span><span class="blabel">48px</span></div>
+            <div class="fav"><span class="fav__tab"><img src="assets/img/favicon-pilares.svg" width="72" height="72" alt="72px"></span><span class="blabel">72px</span></div>
+            <div class="fav"><span class="fav__tab"><img src="assets/img/favicon-pilares.svg" width="120" height="120" alt="120px"></span><span class="blabel">app icon</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MASCOTE -->
+    <section class="section section--tight">
+      <div class="container split" style="align-items:center">
+        <div class="bcard" style="min-height:280px">
+          <svg viewBox="0 0 120 152" width="150" height="190" xmlns="http://www.w3.org/2000/svg" aria-label="Mascote LAo">
+            <defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b6cff"/><stop offset="1" stop-color="#24e3d6"/></linearGradient></defs>
+            <rect x="49" y="118" width="9" height="22" rx="4.5" fill="url(#mg)"/><rect x="62" y="118" width="9" height="22" rx="4.5" fill="url(#mg)"/>
+            <rect x="83" y="86" width="8" height="26" rx="4" fill="url(#mg)"/>
+            <rect x="36" y="82" width="48" height="42" rx="15" fill="#12121c" stroke="url(#mg)" stroke-width="2.5"/><circle cx="60" cy="103" r="5" fill="url(#mg)"/>
+            <rect x="52" y="76" width="16" height="9" fill="#12121c" stroke="url(#mg)" stroke-width="2"/>
+            <line x1="60" y1="30" x2="60" y2="16" stroke="url(#mg)" stroke-width="3" stroke-linecap="round"/><circle cx="60" cy="11" r="5" fill="url(#mg)"/>
+            <rect x="24" y="46" width="7" height="18" rx="3" fill="url(#mg)"/><rect x="89" y="46" width="7" height="18" rx="3" fill="url(#mg)"/>
+            <rect x="30" y="30" width="60" height="52" rx="17" fill="#12121c" stroke="url(#mg)" stroke-width="2.5"/>
+            <rect x="38" y="40" width="44" height="34" rx="11" fill="#0a0a10"/>
+            <circle cx="51" cy="56" r="6.5" fill="#24e3d6"/><circle cx="51" cy="56" r="2.8" fill="#08080c"/>
+            <circle cx="69" cy="56" r="6.5" fill="#24e3d6"/><circle cx="69" cy="56" r="2.8" fill="#08080c"/>
+            <path d="M53 65 q7 6 14 0" fill="none" stroke="#8b6cff" stroke-width="2.6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <p class="eyebrow">O mascote</p>
+          <h2 class="section__title">Oi, eu sou o <span class="gradient-text">LAo</span>.</h2>
+          <p class="section__lead">O personagem que dá vida ao site: anda pela tela, pisca, segue o cursor, acena e comenta cada seção. A cara amigável e techie da LA.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container"><div class="footer__bottom" style="border-top:none;padding-top:0"><p>© <span id="year">2026</span> LA Software House · Brand Guide v1.0</p><a class="link-arrow" href="index.html">Ver o site <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></div>
+  </footer>
+  <script>document.getElementById('year').textContent=new Date().getFullYear();</script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 344 72" role="img" aria-label="LA Software House">
+  <defs>
+    <!-- Borda / marca -->
+    <linearGradient id="pGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a67bff"/>
+      <stop offset="0.5" stop-color="#6d5cff"/>
+      <stop offset="1" stop-color="#22e3d6"/>
+    </linearGradient>
+    <!-- Céu do chip: noite com nébula -->
+    <linearGradient id="pSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#191a2e"/>
+      <stop offset="0.6" stop-color="#0e0e1a"/>
+      <stop offset="1" stop-color="#0a0a12"/>
+    </linearGradient>
+    <radialGradient id="pNebula" cx="0.32" cy="0.18" r="0.75">
+      <stop offset="0" stop-color="#7c5cff" stop-opacity="0.34"/>
+      <stop offset="0.55" stop-color="#7c5cff" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#7c5cff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="pNebula2" cx="0.85" cy="0.9" r="0.6">
+      <stop offset="0" stop-color="#22e3d6" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#22e3d6" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Pilar iluminado de cima (luz do spark) -->
+    <linearGradient id="pBar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#54f2e6"/>
+      <stop offset="0.42" stop-color="#6d5cff"/>
+      <stop offset="1" stop-color="#3a3190"/>
+    </linearGradient>
+    <linearGradient id="pBarDim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4b64c9"/>
+      <stop offset="1" stop-color="#272456"/>
+    </linearGradient>
+    <!-- L branco com leve modelagem -->
+    <linearGradient id="pL" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cdd6ff"/>
+    </linearGradient>
+    <!-- Halo do spark -->
+    <radialGradient id="pSpark" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="0.35" stop-color="#bcaaff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#bcaaff" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Fade do reflexo -->
+    <linearGradient id="pRef" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8f9bff" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#8f9bff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="pBlur" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="1.6"/>
+    </filter>
+    <clipPath id="pClip"><rect x="4" y="4" width="64" height="64" rx="17"/></clipPath>
+  </defs>
+
+  <!-- ===== CHIP / CENA ===== -->
+  <g clip-path="url(#pClip)">
+    <rect x="4" y="4" width="64" height="64" fill="url(#pSky)"/>
+    <rect x="4" y="4" width="64" height="64" fill="url(#pNebula)"/>
+    <rect x="4" y="4" width="64" height="64" fill="url(#pNebula2)"/>
+
+    <!-- estrelas -->
+    <circle cx="14" cy="13" r="0.8" fill="#ffffff" opacity="0.55"/>
+    <circle cx="59" cy="10" r="0.7" fill="#ffffff" opacity="0.4"/>
+    <circle cx="25" cy="8"  r="0.6" fill="#ffffff" opacity="0.35"/>
+    <circle cx="63" cy="24" r="0.7" fill="#bcaaff" opacity="0.5"/>
+    <circle cx="9"  cy="40" r="0.6" fill="#8ff0e8" opacity="0.45"/>
+
+    <!-- Camada distante (profundidade atmosférica) -->
+    <rect x="20.5" y="32" width="5" height="20" rx="2.5" fill="url(#pBarDim)" opacity="0.5"/>
+    <rect x="29"   y="24" width="5" height="28" rx="2.5" fill="url(#pBarDim)" opacity="0.45"/>
+    <rect x="48"   y="30" width="5" height="22" rx="2.5" fill="url(#pBarDim)" opacity="0.5"/>
+    <rect x="57"   y="37" width="4" height="15" rx="2"   fill="url(#pBarDim)" opacity="0.4"/>
+
+    <!-- Reflexo abaixo da fundação -->
+    <g opacity="0.75">
+      <rect x="13"   y="59.5" width="6.5" height="7"   rx="3"   fill="url(#pRef)"/>
+      <rect x="33.5" y="59.5" width="6.5" height="8.5" rx="3"   fill="url(#pRef)"/>
+      <rect x="43"   y="59.5" width="6.5" height="6"   rx="3"   fill="url(#pRef)"/>
+    </g>
+
+    <!-- Glow da fundação -->
+    <rect x="13" y="52" width="46" height="7" rx="3.5" fill="#22e3d6" opacity="0.35" filter="url(#pBlur)"/>
+
+    <!-- ===== L branco: pilar + fundação ===== -->
+    <rect x="13" y="30" width="6.5" height="24" rx="3" fill="url(#pL)"/>
+    <rect x="13" y="53" width="46" height="5.5" rx="2.75" fill="url(#pL)"/>
+    <rect x="14.1" y="31.2" width="1.5" height="14" rx="0.75" fill="#ffffff" opacity="0.9"/>
+
+    <!-- ===== Pilares principais ===== -->
+    <rect x="24"   y="36" width="6.5" height="16" rx="3" fill="url(#pBar)" opacity="0.92"/>
+    <rect x="25.1" y="37.2" width="1.4" height="8" rx="0.7" fill="#aef7f0" opacity="0.55"/>
+
+    <rect x="33.5" y="16" width="6.5" height="36" rx="3" fill="url(#pBar)"/>
+    <rect x="34.6" y="17.4" width="1.4" height="16" rx="0.7" fill="#d8fffb" opacity="0.75"/>
+
+    <rect x="43"   y="28" width="6.5" height="24" rx="3" fill="url(#pBar)" opacity="0.96"/>
+    <rect x="44.1" y="29.2" width="1.4" height="11" rx="0.7" fill="#aef7f0" opacity="0.6"/>
+
+    <rect x="52.5" y="40" width="6.5" height="12" rx="3" fill="url(#pBar)" opacity="0.88"/>
+    <rect x="53.6" y="41.2" width="1.4" height="5.5" rx="0.7" fill="#aef7f0" opacity="0.5"/>
+
+    <!-- ===== Spark: halo + estrela ===== -->
+    <circle cx="36.7" cy="11" r="9" fill="url(#pSpark)"/>
+    <path d="M36.7 4.2 L38.6 9.2 L43.6 11 L38.6 12.8 L36.7 17.8 L34.8 12.8 L29.8 11 L34.8 9.2 Z" fill="#ffffff"/>
+    <path d="M45.5 6.5 l0.8 2 2 0.8 -2 0.8 -0.8 2 -0.8 -2 -2 -0.8 2 -0.8 Z" fill="#ffffff" opacity="0.7"/>
+  </g>
+
+  <!-- Borda do chip -->
+  <rect x="4.7" y="4.7" width="62.6" height="62.6" rx="16.5" fill="none" stroke="url(#pGrad)" stroke-width="1.4" stroke-opacity="0.9"/>
+
+  <!-- ===== Wordmark ===== -->
+  <text x="84" y="40" font-family="'Space Grotesk','Helvetica Neue',Arial,sans-serif" font-size="33" font-weight="700" fill="#f5f6fb" letter-spacing="-0.8">Software House</text>
+  <text x="85" y="58" font-family="'JetBrains Mono','Courier New',monospace" font-size="11" font-weight="500" fill="#37eadd" letter-spacing="4">DIGITAL · APPS · SAAS</text>
+</svg>

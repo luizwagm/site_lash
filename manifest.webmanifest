@@ -1,0 +1,14 @@
+{
+  "name": "LA Software House",
+  "short_name": "LA",
+  "description": "Sites, portais, aplicativos e plataformas SaaS sob medida.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#08080c",
+  "theme_color": "#08080c",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "assets/img/favicon-pilares.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

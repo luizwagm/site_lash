@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="dark">
+  <title>Gerenciador — LA Software House</title>
+  <link rel="icon" href="/assets/img/favicon-pilares.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <style>
+    :root{--bg:#08080c;--bg2:#0d0d14;--surface:#14141f;--surface2:#1b1b28;--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.16);
+      --text:#f3f4fb;--muted:#9a9db1;--dim:#656879;--violet:#7c5cff;--cyan:#24e3d6;--red:#ff5c7a;
+      --grad:linear-gradient(120deg,#7c5cff,#24e3d6);--r:12px;--mono:'JetBrains Mono',monospace}
+    *{box-sizing:border-box;margin:0}
+    [hidden]{display:none !important}
+    body{font:15px/1.6 Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    h1,h2,h3{font-family:'Space Grotesk',sans-serif;letter-spacing:-.02em}
+    button{font:inherit;cursor:pointer;color:inherit}
+    input,textarea,select{width:100%;padding:.65rem .8rem;font:inherit;color:var(--text);background:var(--bg2);
+      border:1px solid var(--line2);border-radius:8px}
+    input:focus,textarea:focus,select:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(124,92,255,.25)}
+    textarea{resize:vertical;min-height:80px}
+    label{font-size:.8rem;font-weight:600;color:var(--muted);display:block;margin:.8rem 0 .3rem}
+    .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.1rem;border-radius:999px;border:1px solid transparent;font-weight:600}
+    .btn-grad{background:var(--grad);color:#08080c}
+    .btn-ghost{background:rgba(255,255,255,.05);border-color:var(--line2)}
+    .btn-danger{background:rgba(255,92,122,.12);color:var(--red);border-color:rgba(255,92,122,.3)}
+    .btn-sm{padding:.35rem .7rem;font-size:.8rem}
+    /* layout */
+    .app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+    aside{background:var(--bg2);border-right:1px solid var(--line);padding:1.2rem;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+    aside img{height:44px;width:auto;margin-bottom:1.4rem}
+    .navbtn{display:block;width:100%;text-align:left;padding:.6rem .8rem;border-radius:8px;border:0;background:none;color:var(--muted);font-weight:500;margin-bottom:.15rem}
+    .navbtn:hover{background:rgba(255,255,255,.05);color:var(--text)}
+    .navbtn.on{background:rgba(124,92,255,.15);color:var(--text)}
+    main{padding:2rem 2.4rem;max-width:1040px}
+    .panel{display:none}.panel.on{display:block}
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1.2rem;margin-bottom:1rem}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:0 1rem}
+    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 1rem}
+    .item-head{display:flex;justify-content:space-between;align-items:center;gap:1rem}
+    .item-title{font-weight:600}
+    .hint{font-size:.75rem;color:var(--dim);font-family:var(--mono)}
+    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.6rem}
+    .toast{position:fixed;bottom:1.2rem;left:50%;transform:translate(-50%,150%);background:var(--surface2);
+      border:1px solid var(--line2);padding:.8rem 1.3rem;border-radius:999px;font-weight:600;transition:transform .3s;z-index:99}
+    .toast.on{transform:translate(-50%,0)}
+    .toast.err{border-color:var(--red);color:var(--red)}
+    .thumb{width:74px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
+    /* login */
+    #login{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:50}
+    #login .card{width:min(360px,90vw);text-align:center;padding:2rem}
+    .mt{margin-top:1rem}.mb{margin-bottom:1rem}.right{text-align:right}
+    .pill{font-family:var(--mono);font-size:.7rem;padding:.15rem .5rem;border:1px solid var(--line2);border-radius:999px;color:var(--dim)}
+    @media(max-width:820px){.app{grid-template-columns:1fr}aside{position:static;height:auto;flex-direction:row;align-items:center;flex-wrap:wrap;gap:.3rem}aside img{margin:0 1rem 0 0}main{padding:1.2rem}}
+  </style>
+</head>
+<body>
+
+<div id="login" hidden>
+  <div class="card">
+    <img src="/assets/img/favicon-pilares.svg" width="64" height="64" alt="LA" style="margin:0 auto 1rem">
+    <h2 style="margin-bottom:.4rem">Gerenciador LA</h2>
+    <p style="color:var(--muted);font-size:.85rem" class="mb">Entre para editar o site.</p>
+    <input type="password" id="pw" placeholder="Senha" autocomplete="current-password">
+    <button class="btn btn-grad mt" style="width:100%;justify-content:center" onclick="login()">Entrar</button>
+    <p class="hint mt">senha inicial: la-admin</p>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
+  <aside>
+    <img src="/assets/img/logo-pilares.svg" alt="LA Software House">
+    <button class="navbtn on" data-p="dash">▲ Publicar</button>
+    <button class="navbtn" data-p="projects">Portfólio</button>
+    <button class="navbtn" data-p="services">Serviços</button>
+    <button class="navbtn" data-p="texts">Textos do site</button>
+    <button class="navbtn" data-p="testimonials">Depoimentos</button>
+    <button class="navbtn" data-p="faq">FAQ</button>
+    <button class="navbtn" data-p="contact">Contato</button>
+    <button class="navbtn" data-p="password">Senha</button>
+    <div style="margin-top:auto">
+      <a class="navbtn" href="/" target="_blank" style="text-decoration:none;display:block">↗ Ver o site</a>
+      <button class="navbtn" onclick="logout()">Sair</button>
+    </div>
+  </aside>
+
+  <main>
+    <!-- PUBLICAR -->
+    <section class="panel on" id="p-dash">
+      <div class="topbar"><h1>Publicar</h1><span class="pill">SQLite · node:sqlite</span></div>
+      <div class="card">
+        <p style="color:var(--muted)">As edições ficam salvas no banco. Quando estiver satisfeito, clique em <b>Publicar site</b>: o index, o portfólio, as páginas de case e o sitemap são regenerados na hora.</p>
+        <button class="btn btn-grad mt" onclick="publishSite()">🚀 Publicar site</button>
+        <p class="hint mt" id="pub-log"></p>
+      </div>
+    </section>
+
+    <!-- PORTFÓLIO -->
+    <section class="panel" id="p-projects">
+      <div class="topbar"><h1>Portfólio</h1><button class="btn btn-ghost" onclick="editProject(null)">+ Novo projeto</button></div>
+      <div id="projects-list"></div>
+      <div class="card" id="project-form" hidden>
+        <h3 id="pf-title" class="mb">Editar projeto</h3>
+        <div class="row">
+          <div><label>Título</label><input id="pf_title"></div>
+          <div><label>Slug (URL) <span class="hint">/projeto/slug/</span></label><input id="pf_id"></div>
+        </div>
+        <div class="row3">
+          <div><label>Categoria</label><select id="pf_category"><option value="sites">sites</option><option value="portais">portais</option><option value="apps">apps</option><option value="saas">saas</option></select></div>
+          <div><label>Rótulo</label><input id="pf_categoryLabel" placeholder="Ex.: Portal"></div>
+          <div><label>Ano</label><input id="pf_year"></div>
+        </div>
+        <div class="row">
+          <div><label>Selo</label><input id="pf_badge" placeholder="Ex.: Enterprise"></div>
+          <div><label>Cliente</label><input id="pf_client"></div>
+        </div>
+        <label>Resumo (aparece no card e na busca)</label><textarea id="pf_summary"></textarea>
+        <label>O desafio</label><textarea id="pf_challenge"></textarea>
+        <label>A solução</label><textarea id="pf_solution"></textarea>
+        <label>Resultados <span class="hint">um por linha: numero | texto</span></label><textarea id="pf_results" placeholder="8→1 | intranets unificadas"></textarea>
+        <label>Entregas <span class="hint">uma por linha</span></label><textarea id="pf_features"></textarea>
+        <label>Stack <span class="hint">separada por vírgula</span></label><input id="pf_stack" placeholder="Next.js, Node, PostgreSQL">
+        <label>Foto do projeto</label>
+        <div style="display:flex;gap:.6rem;align-items:center">
+          <input id="pf_image" placeholder="URL da imagem ou envie um arquivo →" style="flex:1">
+          <input type="file" id="pf_upload" accept="image/*" hidden onchange="uploadImg(this,'pf_image')">
+          <button class="btn btn-ghost btn-sm" onclick="pf_upload.click()">Enviar foto</button>
+          <img class="thumb" id="pf_thumb" alt="" hidden>
+        </div>
+        <div class="right mt">
+          <button class="btn btn-ghost" onclick="project_form.hidden=true">Cancelar</button>
+          <button class="btn btn-grad" onclick="saveProject()">Salvar projeto</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SERVIÇOS -->
+    <section class="panel" id="p-services">
+      <div class="topbar"><h1>Serviços</h1><button class="btn btn-ghost" onclick="addRow('services')">+ Novo serviço</button></div>
+      <div id="services-list"></div>
+    </section>
+
+    <!-- TEXTOS -->
+    <section class="panel" id="p-texts">
+      <div class="topbar"><h1>Textos do site</h1><button class="btn btn-grad" onclick="saveTexts()">Salvar textos</button></div>
+      <div class="card">
+        <h3>Topo (hero)</h3>
+        <label>Selo <span class="hint">HTML permitido</span></label><input id="s_hero_badge">
+        <label>Título <span class="hint">HTML permitido — use &lt;span class="gradient-text"&gt; para o gradiente</span></label><textarea id="s_hero_title"></textarea>
+        <label>Subtítulo <span class="hint">HTML permitido</span></label><textarea id="s_hero_lead"></textarea>
+        <label>Métricas <span class="hint">uma por linha: numero | texto</span></label><textarea id="s_stats"></textarea>
+      </div>
+      <div class="card">
+        <h3>Seção "Por que a LA"</h3>
+        <label>Título</label><input id="s_about_title">
+        <label>Texto</label><textarea id="s_about_lead"></textarea>
+        <label>Bullets <span class="hint">um por linha</span></label><textarea id="s_about_bullets"></textarea>
+      </div>
+      <div class="card">
+        <h3>Rodapé</h3>
+        <label>Frase da marca</label><textarea id="s_footer_tagline"></textarea>
+      </div>
+    </section>
+
+    <!-- DEPOIMENTOS -->
+    <section class="panel" id="p-testimonials">
+      <div class="topbar"><h1>Depoimentos</h1><button class="btn btn-ghost" onclick="addRow('testimonials')">+ Novo depoimento</button></div>
+      <div id="testimonials-list"></div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="panel" id="p-faq">
+      <div class="topbar"><h1>Perguntas frequentes</h1><button class="btn btn-ghost" onclick="addRow('faq')">+ Nova pergunta</button></div>
+      <div id="faq-list"></div>
+    </section>
+
+    <!-- CONTATO -->
+    <section class="panel" id="p-contact">
+      <div class="topbar"><h1>Dados de contato</h1><button class="btn btn-grad" onclick="saveTexts()">Salvar contato</button></div>
+      <div class="card">
+        <label>E-mail</label><input id="s_contact_email" type="email">
+        <label>Tempo de resposta</label><input id="s_contact_response">
+        <label>Atuação</label><input id="s_contact_area">
+      </div>
+    </section>
+
+    <!-- SENHA -->
+    <section class="panel" id="p-password">
+      <div class="topbar"><h1>Trocar senha</h1></div>
+      <div class="card" style="max-width:420px">
+        <label>Senha atual</label><input type="password" id="pw_cur" autocomplete="current-password">
+        <label>Nova senha</label><input type="password" id="pw_new" autocomplete="new-password">
+        <button class="btn btn-grad mt" onclick="changePw()">Salvar nova senha</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let DATA = null;
+
+/* ------------------------------- infra ---------------------------------- */
+async function api(url, method = "GET", body) {
+  const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+let toastT;
+function toast(msg, err = false) {
+  const t = $("#toast"); t.textContent = msg; t.classList.toggle("err", err); t.classList.add("on");
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 3000);
+}
+const escA = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+
+/* ------------------------------- auth ----------------------------------- */
+async function boot() {
+  try { await api("/api/me"); showApp(); } catch { $("#login").hidden = false; }
+}
+async function login() {
+  try { await api("/api/login", "POST", { password: $("#pw").value }); $("#login").hidden = true; showApp(); }
+  catch (e) { toast(e.message, true); }
+}
+async function logout() { await api("/api/logout", "POST"); location.reload(); }
+$("#pw")?.addEventListener("keydown", (e) => e.key === "Enter" && login());
+
+async function showApp() {
+  $("#app").hidden = false;
+  await loadAll();
+}
+
+/* -------------------------------- nav ----------------------------------- */
+document.querySelectorAll(".navbtn[data-p]").forEach((b) =>
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".navbtn[data-p]").forEach((x) => x.classList.remove("on"));
+    document.querySelectorAll(".panel").forEach((x) => x.classList.remove("on"));
+    b.classList.add("on");
+    $("#p-" + b.dataset.p).classList.add("on");
+  })
+);
+
+/* ------------------------------ carregar --------------------------------- */
+async function loadAll() {
+  DATA = await api("/api/content");
+  DATA.projects = await api("/api/projects");
+  // textos
+  for (const k of ["hero_badge","hero_title","hero_lead","about_title","about_lead","footer_tagline","contact_email","contact_response","contact_area"])
+    $("#s_" + k).value = DATA.settings[k];
+  $("#s_stats").value = JSON.parse(DATA.settings.stats || "[]").map((s) => `${s.num} | ${s.label}`).join("\n");
+  $("#s_about_bullets").value = JSON.parse(DATA.settings.about_bullets || "[]").join("\n");
+  renderProjects(); renderTable("services"); renderTable("testimonials"); renderTable("faq");
+}
+
+/* ------------------------------ publicar --------------------------------- */
+async function publishSite() {
+  $("#pub-log").textContent = "Publicando…";
+  try {
+    const r = await api("/api/publish", "POST");
+    $("#pub-log").textContent = `✓ Publicado — ${r.pages} projetos · ${r.buildLog}`;
+    toast("Site publicado! 🚀");
+  } catch (e) { $("#pub-log").textContent = ""; toast(e.message, true); }
+}
+
+/* ------------------------------ textos ----------------------------------- */
+async function saveTexts() {
+  const body = {};
+  for (const k of ["hero_badge","hero_title","hero_lead","about_title","about_lead","footer_tagline","contact_email","contact_response","contact_area"])
+    body[k] = $("#s_" + k).value;
+  body.stats = JSON.stringify($("#s_stats").value.split("\n").filter(Boolean).map((l) => {
+    const [num, ...rest] = l.split("|"); return { num: num.trim(), label: rest.join("|").trim() };
+  }));
+  body.about_bullets = JSON.stringify($("#s_about_bullets").value.split("\n").map((s) => s.trim()).filter(Boolean));
+  await api("/api/settings", "PUT", body);
+  toast("Textos salvos. Lembre de publicar!");
+}
+
+/* ----------------------------- portfólio --------------------------------- */
+function renderProjects() {
+  $("#projects-list").innerHTML = DATA.projects.map((p) => `
+    <div class="card item-head">
+      <div style="display:flex;gap:.8rem;align-items:center">
+        ${p.image ? `<img class="thumb" src="${escA(p.image)}" alt="">` : ""}
+        <div><div class="item-title">${escA(p.title)}</div>
+        <div class="hint">/projeto/${p.id}/ · ${escA(p.categoryLabel)} · ${escA(p.year)}</div></div>
+      </div>
+      <div>
+        <button class="btn btn-ghost btn-sm" onclick='editProject(${JSON.stringify(p.id)})'>Editar</button>
+        <button class="btn btn-danger btn-sm" onclick='delProject(${JSON.stringify(p.id)})'>Excluir</button>
+      </div>
+    </div>`).join("");
+}
+let editingId = null;
+function editProject(id) {
+  editingId = id;
+  const p = id ? DATA.projects.find((x) => x.id === id) : { results: [], features: [], stack: [] };
+  $("#pf-title").textContent = id ? "Editar projeto" : "Novo projeto";
+  $("#pf_id").value = p.id || ""; $("#pf_id").disabled = !!id;
+  for (const f of ["title","category","categoryLabel","year","badge","client","summary","challenge","solution","image"])
+    $("#pf_" + f).value = p[f] || "";
+  $("#pf_results").value = (p.results || []).map((r) => `${r.num} | ${r.label}`).join("\n");
+  $("#pf_features").value = (p.features || []).join("\n");
+  $("#pf_stack").value = (p.stack || []).join(", ");
+  const th = $("#pf_thumb"); th.hidden = !p.image; if (p.image) th.src = p.image;
+  $("#project-form").hidden = false;
+  $("#project-form").scrollIntoView({ behavior: "smooth" });
+}
+async function saveProject() {
+  const b = {
+    id: $("#pf_id").value, title: $("#pf_title").value, category: $("#pf_category").value,
+    categoryLabel: $("#pf_categoryLabel").value, year: $("#pf_year").value, badge: $("#pf_badge").value,
+    client: $("#pf_client").value, summary: $("#pf_summary").value, challenge: $("#pf_challenge").value,
+    solution: $("#pf_solution").value, image: $("#pf_image").value,
+    results: $("#pf_results").value.split("\n").filter(Boolean).map((l) => { const [num, ...r] = l.split("|"); return { num: num.trim(), label: r.join("|").trim() }; }),
+    features: $("#pf_features").value.split("\n").map((s) => s.trim()).filter(Boolean),
+    stack: $("#pf_stack").value.split(",").map((s) => s.trim()).filter(Boolean),
+  };
+  try {
+    if (editingId) await api("/api/projects/" + editingId, "PUT", b);
+    else await api("/api/projects", "POST", b);
+    $("#project-form").hidden = true;
+    DATA.projects = await api("/api/projects");
+    renderProjects();
+    toast("Projeto salvo. Lembre de publicar!");
+  } catch (e) { toast(e.message, true); }
+}
+async function delProject(id) {
+  if (!confirm("Excluir este projeto?")) return;
+  await api("/api/projects/" + id, "DELETE");
+  DATA.projects = await api("/api/projects");
+  renderProjects();
+  toast("Projeto excluído. Lembre de publicar!");
+}
+
+/* -------------------- tabelas simples (serviços/depo/faq) ---------------- */
+const TDEFS = {
+  services: { fields: [["title","Título","input"],["text","Descrição","textarea"],["tags","Tags (vírgula)","input"]], parse: (v,f)=> f==="tags" ? v.split(",").map(s=>s.trim()).filter(Boolean) : v, show: (r,f)=> f==="tags" ? JSON.parse(r.tags||"[]").join(", ") : (r[f]||"") },
+  testimonials: { fields: [["text","Depoimento","textarea"],["name","Nome","input"],["role","Cargo/empresa","input"],["initials","Iniciais","input"]], parse: (v)=>v, show: (r,f)=> r[f]||"" },
+  faq: { fields: [["question","Pergunta","input"],["answer","Resposta","textarea"]], parse: (v)=>v, show: (r,f)=> r[f]||"" },
+};
+function renderTable(t) {
+  const def = TDEFS[t];
+  $("#" + t + "-list").innerHTML = DATA[t].map((r) => `
+    <div class="card">
+      ${def.fields.map(([f, lab, kind]) =>
+        `<label>${lab}</label>` + (kind === "textarea"
+          ? `<textarea data-t="${t}" data-id="${r.id}" data-f="${f}">${escA(def.show(r, f))}</textarea>`
+          : `<input data-t="${t}" data-id="${r.id}" data-f="${f}" value="${escA(def.show(r, f))}">`)
+      ).join("")}
+      <div class="right mt">
+        <button class="btn btn-danger btn-sm" onclick="delRow('${t}',${r.id})">Excluir</button>
+        <button class="btn btn-grad btn-sm" onclick="saveRow('${t}',${r.id})">Salvar</button>
+      </div>
+    </div>`).join("");
+}
+async function saveRow(t, id) {
+  const def = TDEFS[t]; const body = {};
+  document.querySelectorAll(`[data-t="${t}"][data-id="${id}"]`).forEach((el) => { body[el.dataset.f] = def.parse(el.value, el.dataset.f); });
+  await api(`/api/${t}/${id}`, "PUT", body);
+  toast("Salvo. Lembre de publicar!");
+}
+async function addRow(t) {
+  const blank = { services: { title: "Novo serviço", text: "", tags: [] },
+    testimonials: { text: "", name: "", role: "", initials: "" },
+    faq: { question: "Nova pergunta?", answer: "" } }[t];
+  await api("/api/" + t, "POST", blank);
+  DATA = Object.assign(DATA, await api("/api/content"));
+  renderTable(t);
+}
+async function delRow(t, id) {
+  if (!confirm("Excluir este item?")) return;
+  await api(`/api/${t}/${id}`, "DELETE");
+  DATA = Object.assign(DATA, await api("/api/content"));
+  renderTable(t);
+  toast("Excluído. Lembre de publicar!");
+}
+
+/* ------------------------------- upload ---------------------------------- */
+function uploadImg(input, targetId) {
+  const file = input.files[0]; if (!file) return;
+  const fr = new FileReader();
+  fr.onload = async () => {
+    try {
+      const r = await api("/api/upload", "POST", { name: file.name, dataUrl: fr.result });
+      $("#" + targetId).value = r.path;
+      const th = $("#pf_thumb"); th.src = r.path; th.hidden = false;
+      toast("Foto enviada!");
+    } catch (e) { toast(e.message, true); }
+  };
+  fr.readAsDataURL(file);
+}
+
+/* -------------------------------- senha ---------------------------------- */
+async function changePw() {
+  try {
+    await api("/api/password", "POST", { current: $("#pw_cur").value, next: $("#pw_new").value });
+    $("#pw_cur").value = $("#pw_new").value = "";
+    toast("Senha alterada!");
+  } catch (e) { toast(e.message, true); }
+}
+
+boot();
+</script>
+</body>
+</html>
