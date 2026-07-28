@@ -131,13 +131,45 @@ function initContactForm() {
     e.preventDefault();
     if (!form.reportValidity()) return;
     const d = Object.fromEntries(new FormData(form).entries());
-    // Envia o briefing pelo WhatsApp da LA.
-    const msg = encodeURIComponent(
-      `Olá! Quero um orçamento com a LA Software House.\n\n` +
-      `Nome: ${d.nome}\nEmpresa: ${d.empresa || "-"}\nE-mail: ${d.email}\n` +
-      `Tipo de projeto: ${d.tipo}\nOrçamento previsto: ${d.orcamento || "-"}\n\nBriefing:\n${d.mensagem}`
+    const limpo = (v) => String(v || "").trim();
+
+    /* O WhatsApp entende uma marcação própria: *negrito*, _itálico_ e
+       ```monoespaçado```. Usar isso deixa o briefing legível no celular, em vez
+       de um bloco de texto corrido — que era o que chegava antes.
+       Campo vazio SOME da mensagem: melhor não ter a linha do que receber
+       "Empresa: -", que ocupa espaço e não informa nada. */
+    // cada bloco é um grupo de linhas; as vazias são descartadas DENTRO do
+    // bloco, e os blocos são separados por uma linha em branco só
+    const bloco = (...linhas) => linhas.filter(Boolean).join("\n");
+    const quem = bloco(
+      `*Nome:* ${limpo(d.nome)}`,
+      limpo(d.empresa) ? `*Empresa:* ${limpo(d.empresa)}` : "",
+      `*E-mail:* ${limpo(d.email)}`,
     );
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, "_blank", "noopener");
+    const projeto = bloco(
+      `*Tipo de projeto:* ${limpo(d.tipo)}`,
+      limpo(d.orcamento) ? `*Orçamento previsto:* ${limpo(d.orcamento)}` : "",
+    );
+    const quando = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+
+    const texto = [
+      "*Novo briefing — luizaugust.me*",
+      quem,
+      projeto,
+      bloco("*Sobre o projeto*", limpo(d.mensagem)),
+      `_Enviado pelo site em ${quando}_`,
+    ].filter(Boolean).join("\n\n");
+    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(texto)}`;
+
+    /* No celular o window.open costuma ser barrado ou abre uma aba órfã que
+       fica para trás depois de o app assumir. Navegar na própria aba leva
+       direto ao WhatsApp e não deixa lixo aberto. No desktop, aba nova
+       preserva o site — a pessoa volta e o formulário ainda está lá. */
+    const noCelular = window.matchMedia("(hover: none)").matches;
+    if (noCelular) { window.location.href = url; return; }
+
+    const aba = window.open(url, "_blank", "noopener");
+    if (!aba) { window.location.href = url; return; }   // bloqueador de pop-up
     toast("Abrindo o WhatsApp para enviar o briefing…");
     form.reset();
   });

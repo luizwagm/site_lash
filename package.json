@@ -1,6 +1,6 @@
 {
   "name": "la-software-house",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "private": true,
   "description": "Site e gerenciador de conteúdo da LA Software House (luizaugust.me).",
   "main": "server.js",
