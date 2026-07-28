@@ -6,7 +6,7 @@
    - Formulário de contato (lead) mock
    ========================================================================== */
 
-import { CONTACT_EMAIL, WHATSAPP_NUMBER } from "./config.js";
+import { CONTACT_EMAIL, WHATSAPP_NUMBER, META_PIXEL_ID, LINKEDIN_PARTNER_ID } from "./config.js";
 
 const $ = (s, c = document) => c.querySelector(s);
 const $$ = (s, c = document) => [...c.querySelectorAll(s)];
@@ -206,6 +206,128 @@ function initMagnetic() {
   });
 }
 
+/* ==========================================================================
+   CONSENTIMENTO DE COOKIES (LGPD)
+   O site não grava cookie nenhum por conta própria — o único é o que guarda
+   ESTA escolha. O aviso existe para controlar os scripts de medição (Meta
+   Pixel, LinkedIn Insight): eles só são carregados depois do "Aceitar".
+   É o consentimento PRÉVIO que a lei exige, não o aviso decorativo que carrega
+   tudo antes de você clicar.
+   ========================================================================== */
+const CONSENT_COOKIE = "lash_consent";
+const CONSENT_DIAS = 180;
+
+const lerConsent = () =>
+  (new RegExp(`(?:^|;\\s*)${CONSENT_COOKIE}=(aceito|essenciais)`).exec(document.cookie) || [])[1] || null;
+
+function gravarConsent(valor) {
+  const seguro = location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${CONSENT_COOKIE}=${valor}; Max-Age=${CONSENT_DIAS * 86400}; Path=/; SameSite=Lax${seguro}`;
+}
+
+/* As IDs no config.js nascem como placeholder ("000000000000000"). Carregar um
+   script com ID falso não mede nada e ainda faz o navegador buscar recurso de
+   terceiro à toa — então só vale ID que tenha algum dígito diferente de zero. */
+const idValido = (v) => !!v && /[1-9]/.test(String(v));
+
+let medicaoCarregada = false;
+function carregarMedicao() {
+  if (medicaoCarregada) return;
+  medicaoCarregada = true;
+  const inline = (code) => {
+    const s = document.createElement("script");
+    s.textContent = code;
+    document.head.appendChild(s);
+  };
+
+  if (idValido(META_PIXEL_ID)) {
+    inline(`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+      n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');fbq('init','${META_PIXEL_ID}');fbq('track','PageView');`);
+  }
+  if (idValido(LINKEDIN_PARTNER_ID)) {
+    inline(`_linkedin_partner_id="${LINKEDIN_PARTNER_ID}";window._linkedin_data_partner_ids=
+      window._linkedin_data_partner_ids||[];window._linkedin_data_partner_ids.push(_linkedin_partner_id);
+      (function(l){if(!l){window.lintrk=function(a,b){window.lintrk.q.push([a,b])};window.lintrk.q=[]}
+      var s=document.getElementsByTagName("script")[0];var b=document.createElement("script");
+      b.type="text/javascript";b.async=true;b.src="https://snap.licdn.com/li.lms-analytics/insight.min.js";
+      s.parentNode.insertBefore(b,s);})(window.lintrk);`);
+  }
+}
+
+function montarBannerCookies() {
+  if ($(".cookie-bar")) return;
+  const bar = document.createElement("div");
+  bar.className = "cookie-bar";
+  bar.setAttribute("role", "dialog");
+  bar.setAttribute("aria-live", "polite");
+  bar.setAttribute("aria-label", "Aviso sobre cookies");
+  bar.innerHTML = `
+    <div class="cookie-bar__text">
+      <b>Cookies, sem enrolação. 🍪</b>
+      <p>Este site não grava cookies para funcionar. Com a sua autorização, usamos cookies de
+         medição — só para entender como as pessoas chegam até aqui. Nada além disso.
+         <a href="/privacidade/">Ler a Política de Privacidade</a>.</p>
+    </div>
+    <div class="cookie-bar__acoes">
+      <button type="button" class="btn btn--ghost btn--sm" data-consent="essenciais">Só os essenciais</button>
+      <button type="button" class="btn btn--gradient btn--sm" data-consent="aceito">Aceitar</button>
+    </div>`;
+  document.body.appendChild(bar);
+
+  /* O mascote LAo anda pelo rodapé em posição fixa e ficaria atrás do aviso.
+     Publicamos a altura real da barra numa variável para o CSS subir o mascote
+     exatamente o necessário — altura fixa quebraria quando o texto quebra em
+     mais linhas no celular. */
+  const marcarAltura = () => {
+    document.body.classList.add("has-cookie-bar");
+    document.body.style.setProperty("--cookie-bar-h", `${Math.ceil(bar.getBoundingClientRect().height)}px`);
+  };
+  marcarAltura();
+  window.addEventListener("resize", marcarAltura);
+  requestAnimationFrame(() => bar.classList.add("is-open"));
+
+  bar.addEventListener("click", (e) => {
+    const escolha = e.target.closest("[data-consent]")?.dataset.consent;
+    if (!escolha) return;
+    gravarConsent(escolha);
+    if (escolha === "aceito") carregarMedicao();
+    bar.classList.remove("is-open");
+    document.body.classList.remove("has-cookie-bar");
+    window.removeEventListener("resize", marcarAltura);
+    setTimeout(() => bar.remove(), 350);
+    toast(escolha === "aceito" ? "Preferência salva. Valeu!" : "Certo — só os essenciais.");
+  });
+}
+
+/* Links legais no rodapé. "Privacidade" e "LGPD" já existem no HTML apontando
+   para a página; aqui entra o botão de REVER a escolha, que a lei exige ser tão
+   fácil quanto fazê-la. Injetado por JS para não repetir em cada template. */
+function linksRodape() {
+  const alvo = $(".footer__legal");
+  if (!alvo || $(".cookie-prefs")) return;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "cookie-prefs";
+  b.textContent = "Preferências de cookies";
+  b.addEventListener("click", () => {
+    document.cookie = `${CONSENT_COOKIE}=; Max-Age=0; Path=/`;
+    montarBannerCookies();
+  });
+  // antes do crédito "Feito em casa", que fecha a linha
+  const credito = alvo.querySelector(".dev-credit");
+  if (credito) alvo.insertBefore(b, credito); else alvo.appendChild(b);
+}
+
+function initConsent() {
+  linksRodape();
+  const escolha = lerConsent();
+  if (!escolha) montarBannerCookies();
+  else if (escolha === "aceito") carregarMedicao();
+}
+
 /* ------------------------------ Ano ------------------------------------- */
 function initYear() {
   const el = $("#year");
@@ -222,6 +344,7 @@ function boot() {
   initMagnetic();
   initReveal();
   initYear();
+  initConsent();
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
 else boot();

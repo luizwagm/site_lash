@@ -558,6 +558,48 @@ p { text-wrap: pretty; }
 }
 .toast.is-visible { transform: translate(-50%, 0); }
 .toast svg { color: var(--cyan); }
+/* Com o aviso de cookies aberto o toast subiria por trás dele */
+body.has-cookie-bar .toast { bottom: calc(var(--cookie-bar-h, 0px) + var(--sp-md)); }
+
+/* ------------------------------------------------------------------ *
+ * 14c. AVISO DE COOKIES (LGPD)
+ * ------------------------------------------------------------------ */
+.cookie-bar {
+  position: fixed; inset: auto 0 0 0; z-index: 400;
+  display: flex; align-items: center; justify-content: center;
+  gap: var(--sp-lg); flex-wrap: wrap;
+  padding: var(--sp-md) var(--sp-lg);
+  background: color-mix(in srgb, var(--bg-800) 92%, transparent);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--line-2);
+  box-shadow: var(--sh-lg);
+  transform: translateY(110%); transition: transform 0.45s var(--ease);
+}
+.cookie-bar.is-open { transform: none; }
+.cookie-bar__text { max-width: 68ch; font-size: var(--step--1); color: var(--text-muted); }
+.cookie-bar__text b { color: var(--text); display: block; margin-bottom: 0.2rem; }
+.cookie-bar__text p { margin: 0; }
+.cookie-bar__text a { color: var(--cyan); text-decoration: underline; text-underline-offset: 3px; }
+.cookie-bar__acoes { display: flex; gap: var(--sp-sm); flex-shrink: 0; }
+
+/* Botão "Preferências de cookies" no rodapé — parece link, é botão */
+.cookie-prefs {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; font-size: inherit; color: var(--text-dim);
+  text-decoration: underline; text-underline-offset: 3px;
+  transition: color var(--dur);
+}
+.cookie-prefs:hover { color: var(--text); }
+
+/* Trechos técnicos (CNPJ, nome de cookie) na página de privacidade */
+.mono { font-family: var(--font-mono); font-size: 0.94em; color: var(--text); }
+
+@media (max-width: 720px) {
+  .cookie-bar { flex-direction: column; align-items: stretch; gap: var(--sp-sm); text-align: left; }
+  /* Lado a lado, e não empilhados: a barra fica fixa no rodapé e cada linha a
+     mais come tela de celular — que é justamente onde ela mais atrapalha. */
+  .cookie-bar__acoes .btn { flex: 1; justify-content: center; }
+}
 
 /* ------------------------------------------------------------------ *
  * 14b. EFEITOS — spotlight de cursor + mascote robô (influência flowlab/nfactory)

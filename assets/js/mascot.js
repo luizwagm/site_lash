@@ -22,7 +22,14 @@ if (mascot) {
 
   /* ------------------------- Espaço / posição ---------------------------- */
   const PAD = 8;
-  const groundY = () => window.innerHeight - mascot.offsetHeight - 12;
+  /* O chão sobe quando o aviso de cookies está aberto — senão o LAo anda por
+     trás da barra. A altura vem da variável que o main.js publica, porque a
+     barra cresce quando o texto quebra em mais linhas no celular. */
+  const alturaCookies = () =>
+    parseInt(getComputedStyle(document.body).getPropertyValue("--cookie-bar-h"), 10) || 0;
+  const groundY = () =>
+    window.innerHeight - mascot.offsetHeight - 12 -
+    (document.body.classList.contains("has-cookie-bar") ? alturaCookies() : 0);
   const skyMinY = () => Math.min(90, groundY()); // não invade o header
   const clampX = (x) => Math.max(PAD, Math.min(window.innerWidth - mascot.offsetWidth - PAD, x));
   const clampY = (y) => Math.max(skyMinY(), Math.min(groundY(), y));
