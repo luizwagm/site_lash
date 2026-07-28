@@ -72,6 +72,8 @@
         <h1 style="font-size:var(--step-4);max-width:20ch">{{TITLE}}</h1>
         <p class="section__lead" style="max-width:60ch">{{SUMMARY}}</p>
         <div class="project__stack" style="margin-top:var(--sp-lg)">{{STACK}}</div>
+        <!-- só existe quando o projeto tem endereço cadastrado -->
+        {{LINK_SITE}}
       </div>
     </section>
 
@@ -96,15 +98,19 @@
     <!-- DESAFIO / SOLUÇÃO -->
     <section class="section" data-mascot-say="Todo case tem um desafio... e um deploy 🚀">
       <div class="container grid grid--2" style="gap:var(--sp-2xl)">
+        <!-- DIV, não P: estes dois campos aceitam marcação, e um <p> dentro de
+             outro <p> é fechado pelo navegador na marra — o texto seguinte
+             escaparia do bloco e perderia o estilo. A classe .texto-rico dá o
+             espaçamento de parágrafos e listas. -->
         <div data-reveal>
           <p class="eyebrow">O desafio</p>
           <h2 class="section__title" style="font-size:var(--step-2)">De onde partimos.</h2>
-          <p class="section__lead" style="font-size:var(--step-0)">{{CHALLENGE}}</p>
+          <div class="section__lead texto-rico" style="font-size:var(--step-0)">{{CHALLENGE}}</div>
         </div>
         <div data-reveal data-reveal-delay="1">
           <p class="eyebrow">A solução</p>
           <h2 class="section__title" style="font-size:var(--step-2)">O que construímos.</h2>
-          <p class="section__lead" style="font-size:var(--step-0)">{{SOLUTION}}</p>
+          <div class="section__lead texto-rico" style="font-size:var(--step-0)">{{SOLUTION}}</div>
         </div>
       </div>
     </section>
@@ -119,7 +125,7 @@
         <ul class="list-check" role="list" style="max-width:640px">
           {{FEATURES}}
         </ul>
-        <p style="margin-top:var(--sp-lg);font-family:var(--font-mono);font-size:var(--step--1);color:var(--text-dim)">Cliente: {{CLIENT}} · Conteúdo demonstrativo — case em processo de publicação.</p>
+        <p style="margin-top:var(--sp-lg);font-family:var(--font-mono);font-size:var(--step--1);color:var(--text-dim)">Cliente: {{CLIENT}}{{LINHA_SITE}} · Conteúdo demonstrativo — case em processo de publicação.</p>
       </div>
     </section>
 

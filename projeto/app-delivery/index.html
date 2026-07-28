@@ -72,6 +72,8 @@
         <h1 style="font-size:var(--step-4);max-width:20ch">App de Delivery Regional</h1>
         <p class="section__lead" style="max-width:60ch">Aplicativo com rastreio em tempo real, pagamento integrado e painel do lojista. Publicado nas duas lojas.</p>
         <div class="project__stack" style="margin-top:var(--sp-lg)"><span class="tag">React Native</span><span class="tag">Firebase</span><span class="tag">Maps</span></div>
+        <!-- só existe quando o projeto tem endereço cadastrado -->
+        
       </div>
     </section>
 
@@ -98,15 +100,19 @@
     <!-- DESAFIO / SOLUÇÃO -->
     <section class="section" data-mascot-say="Todo case tem um desafio... e um deploy 🚀">
       <div class="container grid grid--2" style="gap:var(--sp-2xl)">
+        <!-- DIV, não P: estes dois campos aceitam marcação, e um <p> dentro de
+             outro <p> é fechado pelo navegador na marra — o texto seguinte
+             escaparia do bloco e perderia o estilo. A classe .texto-rico dá o
+             espaçamento de parágrafos e listas. -->
         <div data-reveal>
           <p class="eyebrow">O desafio</p>
           <h2 class="section__title" style="font-size:var(--step-2)">De onde partimos.</h2>
-          <p class="section__lead" style="font-size:var(--step-0)">A rede pagava taxas altíssimas aos marketplaces e não tinha relação direta com o cliente. Precisava de app próprio com rastreio e pagamento — sem equipe interna de tecnologia.</p>
+          <div class="section__lead texto-rico" style="font-size:var(--step-0)">A rede pagava taxas altíssimas aos marketplaces e não tinha relação direta com o cliente. Precisava de app próprio com rastreio e pagamento — sem equipe interna de tecnologia.</div>
         </div>
         <div data-reveal data-reveal-delay="1">
           <p class="eyebrow">A solução</p>
           <h2 class="section__title" style="font-size:var(--step-2)">O que construímos.</h2>
-          <p class="section__lead" style="font-size:var(--step-0)">App multiplataforma (React Native) com rastreio em tempo real no mapa, pagamento in-app, push de promoções e um painel web para os lojistas gerirem cardápio e pedidos. Publicação assistida nas duas lojas.</p>
+          <div class="section__lead texto-rico" style="font-size:var(--step-0)">App multiplataforma (React Native) com rastreio em tempo real no mapa, pagamento in-app, push de promoções e um painel web para os lojistas gerirem cardápio e pedidos. Publicação assistida nas duas lojas.</div>
         </div>
       </div>
     </section>

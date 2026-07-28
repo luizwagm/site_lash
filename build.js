@@ -65,6 +65,25 @@ projects.forEach((p, i) => {
 
   const stack = p.stack.map((s) => `<span class="tag">${esc(s)}</span>`).join("");
 
+  /* Botão "Visitar o site" — só existe quando o projeto TEM endereço. Sem url,
+     o marcador vira string vazia e nada é impresso: nem botão desabilitado,
+     nem link morto. É o que o cliente pediu ("quando não tiver, não mostrar").
+     rel="noopener" porque abre em outra aba; "nofollow" para não passar
+     autoridade de SEO do nosso domínio para o site do cliente. */
+  const linkSite = p.url
+    ? `<a class="btn btn--ghost" href="${esc(p.url)}" target="_blank" rel="noopener nofollow">
+             Visitar o site
+             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg>
+           </a>`
+    : "";
+  /* Na linha de crédito, o domínio limpo (sem https:// nem barra final) — é
+     como as pessoas leem e escrevem um endereço. Vem com " · " na frente para
+     emendar no texto que já existe; vazio não deixa separador solto. */
+  const dominio = p.url ? esc(String(p.url).replace(/^https?:\/\//i, "").replace(/\/+$/, "")) : "";
+  const linhaSite = p.url
+    ? ` · Site: <a href="${esc(p.url)}" target="_blank" rel="noopener nofollow" style="color:var(--cyan)">${dominio}</a>`
+    : "";
+
   const html = tpl
     .replaceAll("{{TITLE}}", esc(p.title))
     .replaceAll("{{SUMMARY}}", esc(p.summary))
@@ -74,8 +93,15 @@ projects.forEach((p, i) => {
     .replaceAll("{{BADGE}}", esc(p.badge))
     .replaceAll("{{CLIENT}}", esc(p.client || "Confidencial"))
     .replaceAll("{{IMAGE}}", esc(p.image))
-    .replaceAll("{{CHALLENGE}}", esc(p.challenge))
-    .replaceAll("{{SOLUTION}}", esc(p.solution))
+    /* Desafio e solução saem SEM escapar: são campos que aceitam marcação
+       (parágrafos, negrito, listas, links). O que poderia executar código já
+       foi retirado no servidor, em htmlSeguro(), antes de chegar ao banco —
+       filtrar na gravação e não aqui evita ter de repetir a regra em cada
+       lugar que lê o campo. */
+    .replaceAll("{{CHALLENGE}}", p.challenge || "")
+    .replaceAll("{{SOLUTION}}", p.solution || "")
+    .replaceAll("{{LINK_SITE}}", linkSite)
+    .replaceAll("{{LINHA_SITE}}", linhaSite)
     .replaceAll("{{RESULTS}}", results)
     .replaceAll("{{FEATURES}}", features)
     .replaceAll("{{STACK}}", stack)

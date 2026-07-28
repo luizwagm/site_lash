@@ -8,8 +8,8 @@
     "badge": "Enterprise",
     "client": "Grupo industrial · 8 unidades",
     "summary": "Portal unificado com áreas por perfil, SSO e painel de indicadores em tempo real para um grupo com 8 unidades.",
-    "challenge": "O grupo operava com 8 intranets separadas, logins duplicados e informação espalhada. Comunicados críticos não chegavam ao chão de fábrica e a TI gastava horas com reset de senhas.",
-    "solution": "Projetamos um portal único com SSO via Azure AD, áreas segmentadas por perfil (diretoria, RH, operação) e um painel de indicadores em tempo real integrado ao ERP. Migração faseada, sem parada.",
+    "challenge": "O grupo operava com 8 intranets separadas, uma por unidade — sem login único, com documentos duplicados e nenhuma visão consolidada de indicadores.",
+    "solution": "Projetamos um portal único com SSO via Azure AD, permissões por unidade e um hub de documentos com busca. A arquitetura headless permitiu manter os sistemas legados durante a transição.",
     "results": [
       {
         "num": "8→1",
@@ -37,7 +37,8 @@
       "PostgreSQL",
       "Azure AD"
     ],
-    "image": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=70"
+    "image": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=70",
+    "url": ""
   },
   {
     "id": "saas-analytics",
@@ -77,7 +78,8 @@
       "Nest",
       "Stripe"
     ],
-    "image": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=70"
+    "image": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=70",
+    "url": ""
   },
   {
     "id": "app-delivery",
@@ -116,7 +118,8 @@
       "Firebase",
       "Maps"
     ],
-    "image": "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=1200&q=70"
+    "image": "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=1200&q=70",
+    "url": ""
   },
   {
     "id": "site-institucional",
@@ -155,7 +158,8 @@
       "GSAP",
       "SEO"
     ],
-    "image": "https://images.unsplash.com/photo-1467232004584-a241de8bcf5d?auto=format&fit=crop&w=1200&q=70"
+    "image": "https://images.unsplash.com/photo-1467232004584-a241de8bcf5d?auto=format&fit=crop&w=1200&q=70",
+    "url": ""
   },
   {
     "id": "ecommerce-headless",
@@ -194,6 +198,7 @@
       "Shopify",
       "Vercel"
     ],
-    "image": "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1200&q=70"
+    "image": "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1200&q=70",
+    "url": ""
   }
 ]

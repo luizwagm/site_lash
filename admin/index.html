@@ -165,9 +165,13 @@
           <div><label>Selo</label><input id="pf_badge" placeholder="Ex.: Enterprise"></div>
           <div><label>Cliente</label><input id="pf_client"></div>
         </div>
+        <label>Site do projeto <span class="hint">deixe vazio se não estiver no ar — o botão some do case</span></label>
+        <input id="pf_url" placeholder="empresa.com.br ou https://empresa.com.br" inputmode="url">
         <label>Resumo (aparece no card e na busca)</label><textarea id="pf_summary"></textarea>
-        <label>O desafio</label><textarea id="pf_challenge"></textarea>
-        <label>A solução</label><textarea id="pf_solution"></textarea>
+        <label>O desafio <span class="hint">aceita HTML: &lt;p&gt; &lt;strong&gt; &lt;ul&gt;&lt;li&gt; &lt;a&gt; &lt;code&gt;</span></label>
+        <textarea id="pf_challenge" rows="6"></textarea>
+        <label>A solução <span class="hint">aceita HTML: &lt;p&gt; &lt;strong&gt; &lt;ul&gt;&lt;li&gt; &lt;a&gt; &lt;code&gt;</span></label>
+        <textarea id="pf_solution" rows="6"></textarea>
         <label>Resultados <span class="hint">um por linha: numero | texto</span></label><textarea id="pf_results" placeholder="8→1 | intranets unificadas"></textarea>
         <label>Entregas <span class="hint">uma por linha</span></label><textarea id="pf_features"></textarea>
         <label>Stack <span class="hint">separada por vírgula</span></label><input id="pf_stack" placeholder="Next.js, Node, PostgreSQL">
@@ -380,7 +384,7 @@ function editProject(id) {
   const p = id ? DATA.projects.find((x) => x.id === id) : { results: [], features: [], stack: [] };
   $("#pf-title").textContent = id ? "Editar projeto" : "Novo projeto";
   $("#pf_id").value = p.id || ""; $("#pf_id").disabled = !!id;
-  for (const f of ["title","category","categoryLabel","year","badge","client","summary","challenge","solution","image"])
+  for (const f of ["title","category","categoryLabel","year","badge","client","url","summary","challenge","solution","image"])
     $("#pf_" + f).value = p[f] || "";
   $("#pf_results").value = (p.results || []).map((r) => `${r.num} | ${r.label}`).join("\n");
   $("#pf_features").value = (p.features || []).join("\n");
@@ -393,7 +397,8 @@ async function saveProject() {
   const b = {
     id: $("#pf_id").value, title: $("#pf_title").value, category: $("#pf_category").value,
     categoryLabel: $("#pf_categoryLabel").value, year: $("#pf_year").value, badge: $("#pf_badge").value,
-    client: $("#pf_client").value, summary: $("#pf_summary").value, challenge: $("#pf_challenge").value,
+    client: $("#pf_client").value, url: $("#pf_url").value.trim(),
+    summary: $("#pf_summary").value, challenge: $("#pf_challenge").value,
     solution: $("#pf_solution").value, image: $("#pf_image").value,
     results: $("#pf_results").value.split("\n").filter(Boolean).map((l) => { const [num, ...r] = l.split("|"); return { num: num.trim(), label: r.join("|").trim() }; }),
     features: $("#pf_features").value.split("\n").map((s) => s.trim()).filter(Boolean),

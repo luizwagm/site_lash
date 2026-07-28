@@ -34,7 +34,10 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS projects (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, category TEXT, categoryLabel TEXT,
     year TEXT, badge TEXT, client TEXT, summary TEXT, challenge TEXT, solution TEXT,
-    results TEXT, features TEXT, stack TEXT, image TEXT, sort INTEGER DEFAULT 0
+    results TEXT, features TEXT, stack TEXT, image TEXT, sort INTEGER DEFAULT 0,
+    -- endereço do projeto no ar. Vazio = o botão "Visitar o site" simplesmente
+    -- não é gerado no case (nem meio-link, nem botão morto).
+    url TEXT
   );
   CREATE TABLE IF NOT EXISTS services (
     id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, text TEXT, tags TEXT, sort INTEGER DEFAULT 0
@@ -49,6 +52,12 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, text TEXT, sort INTEGER DEFAULT 0
   );
 `);
+
+/* Migração leve para bancos criados antes destas colunas — o CREATE IF NOT
+   EXISTS não altera tabela existente. Ignora o erro se a coluna já estiver lá. */
+for (const alt of [
+  "ALTER TABLE projects ADD COLUMN url TEXT",
+]) { try { db.exec(alt); } catch { /* já existe */ } }
 
 /* Senha do painel: scrypt com salt individual. Bancos antigos guardavam sha256
    puro — verifyPass aceita os dois e o login migra o legado para scrypt. */
@@ -384,6 +393,8 @@ function publish() {
     badge: p.badge, client: p.client, summary: p.summary, challenge: p.challenge, solution: p.solution,
     results: JSON.parse(p.results || "[]"), features: JSON.parse(p.features || "[]"),
     stack: JSON.parse(p.stack || "[]"), image: p.image,
+    // vazio vira "" e não string "null"/"undefined": o build testa por vazio
+    url: p.url || "",
   }));
   fs.writeFileSync(path.join(ROOT, "assets/data/projects.json"), JSON.stringify(projects, null, 2));
 
@@ -428,9 +439,52 @@ const SETTING_KEYS = ["hero_badge", "hero_title", "hero_lead", "stats",
   "contact_title", "contact_lead", "contact_email", "contact_response", "contact_area", "whatsapp",
   "footer_tagline", "cnpj"];
 const PROJECT_COLS = ["id", "title", "category", "categoryLabel", "year", "badge", "client", "summary", "challenge",
-  "solution", "results", "features", "stack", "image", "sort"];
+  "solution", "results", "features", "stack", "image", "sort", "url"];
 
 const slugify = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+/* ==========================================================================
+   ENDEREÇO DO PROJETO
+   Aceita só http e https. Sem isso, um `javascript:...` gravado aqui viraria
+   um link armadilhado em cima do href do case. Quem digita "empresa.com.br"
+   (o mais comum) recebe o https na frente em vez de um link quebrado.
+   Devolve "" quando não dá para aproveitar — e "" significa "não mostrar".
+   ========================================================================== */
+function urlSegura(v) {
+  const s = String(v || "").trim();
+  if (!s) return "";
+  const comEsquema = /^[a-z][a-z0-9+.-]*:/i.test(s) ? s : "https://" + s;
+  try {
+    const u = new URL(comEsquema);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return "";
+    return u.href;
+  } catch { return ""; }
+}
+
+/* ==========================================================================
+   HTML PERMITIDO EM "DESAFIO" E "SOLUÇÃO"
+   Estes dois campos aceitam marcação para o texto respirar (parágrafos,
+   negrito, listas, links). O que NÃO passa é o que executa código:
+   <script>/<iframe>/<object>/<embed>/<form>, atributos on*=... e hrefs
+   `javascript:`.
+
+   Por que filtrar se só o dono edita: o conteúdo é publicado em HTML estático
+   para todo visitante. Se a senha do painel vazar — e o hash antigo deste
+   projeto está no histórico público do GitHub —, um <script> gravado aqui
+   viraria código rodando no navegador de quem visita o site, com a URL do
+   luizaugust.me na barra. Filtrar custa nada e fecha essa porta.
+   ========================================================================== */
+function htmlSeguro(v) {
+  let s = String(v || "");
+  // elementos que executam ou embutem outra página, com ou sem fechamento
+  s = s.replace(/<\s*(script|iframe|object|embed|form|link|meta|base|style)\b[\s\S]*?<\s*\/\s*\1\s*>/gi, "");
+  s = s.replace(/<\s*\/?\s*(script|iframe|object|embed|form|link|meta|base|style)\b[^>]*>/gi, "");
+  // manipuladores inline: onclick=, onerror=, onload=…
+  s = s.replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  // href/src apontando para pseudo-protocolos executáveis
+  s = s.replace(/\s(href|src|xlink:href)\s*=\s*("|')?\s*(javascript|data|vbscript)\s*:[^"'>\s]*("|')?/gi, "");
+  return s.trim();
+}
 
 /* -------------------------------- Servidor ------------------------------- */
 const server = http.createServer(async (req, res) => {
@@ -501,10 +555,11 @@ const server = http.createServer(async (req, res) => {
         const b = await readBody(req);
         const id = slugify(b.id || b.title || "projeto");
         if (!id || db.prepare("SELECT 1 FROM projects WHERE id=?").get(id)) return json(res, 400, { error: "id vazio ou já existe" });
-        db.prepare("INSERT INTO projects(id,title,category,categoryLabel,year,badge,client,summary,challenge,solution,results,features,stack,image,sort) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        db.prepare("INSERT INTO projects(id,title,category,categoryLabel,year,badge,client,summary,challenge,solution,results,features,stack,image,sort,url) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
           .run(id, b.title || "", b.category || "sites", b.categoryLabel || "", b.year || "", b.badge || "", b.client || "",
-            b.summary || "", b.challenge || "", b.solution || "", JSON.stringify(b.results || []),
-            JSON.stringify(b.features || []), JSON.stringify(b.stack || []), b.image || "", b.sort ?? 99);
+            b.summary || "", htmlSeguro(b.challenge), htmlSeguro(b.solution), JSON.stringify(b.results || []),
+            JSON.stringify(b.features || []), JSON.stringify(b.stack || []), b.image || "", b.sort ?? 99,
+            urlSegura(b.url));
         return json(res, 200, { ok: true, id });
       }
       const pm = p.match(/^\/api\/projects\/([a-z0-9-]+)$/);
@@ -513,7 +568,12 @@ const server = http.createServer(async (req, res) => {
         const sets = []; const vals = [];
         for (const c of PROJECT_COLS) if (c !== "id" && c in b) {
           sets.push(`${c}=?`);
-          vals.push(["results", "features", "stack"].includes(c) ? JSON.stringify(b[c]) : b[c]);
+          vals.push(
+            ["results", "features", "stack"].includes(c) ? JSON.stringify(b[c])
+            : c === "url" ? urlSegura(b[c])
+            // desafio e solução aceitam marcação, menos o que executa código
+            : ["challenge", "solution"].includes(c) ? htmlSeguro(b[c])
+            : b[c]);
         }
         if (sets.length) db.prepare(`UPDATE projects SET ${sets.join(",")} WHERE id=?`).run(...vals, pm[1]);
         return json(res, 200, { ok: true });
