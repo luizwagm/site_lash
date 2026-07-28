@@ -195,44 +195,5 @@
       "Vercel"
     ],
     "image": "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1200&q=70"
-  },
-  {
-    "id": "sistema-intranet",
-    "title": "Sistema de Gestão + Intranet",
-    "category": "portais",
-    "categoryLabel": "Sistema",
-    "year": "2023",
-    "badge": "On-premise",
-    "client": "Empresa de serviços · 300 colaboradores",
-    "summary": "ERP interno com controle de acessos, fluxo de aprovações e relatórios — substituiu 3 planilhas críticas.",
-    "challenge": "Três planilhas gigantes controlavam compras, férias e reembolsos. Erros de versão geravam retrabalho, e nada tinha trilha de auditoria.",
-    "solution": "Sistema web on-premise com fluxos de aprovação configuráveis, perfis de acesso, trilha de auditoria completa e relatórios gerenciais. Treinamento e migração de dados inclusos.",
-    "results": [
-      {
-        "num": "3→0",
-        "label": "planilhas críticas"
-      },
-      {
-        "num": "-85%",
-        "label": "tempo de aprovação"
-      },
-      {
-        "num": "100%",
-        "label": "auditável"
-      }
-    ],
-    "features": [
-      "Workflows de aprovação",
-      "Perfis e permissões",
-      "Trilha de auditoria",
-      "Relatórios gerenciais",
-      "Hospedado na infra do cliente"
-    ],
-    "stack": [
-      "Laravel",
-      "Vue",
-      "MySQL"
-    ],
-    "image": "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1200&q=70"
   }
 ]

@@ -75,12 +75,16 @@
   <aside>
     <img src="/assets/img/logo-pilares.svg" alt="LA Software House">
     <button class="navbtn on" data-p="dash">▲ Publicar</button>
-    <button class="navbtn" data-p="projects">Portfólio</button>
+    <button class="navbtn" data-p="hero">Topo (Hero)</button>
+    <button class="navbtn" data-p="marquee">Tecnologias</button>
     <button class="navbtn" data-p="services">Serviços</button>
-    <button class="navbtn" data-p="texts">Textos do site</button>
+    <button class="navbtn" data-p="projects">Projetos</button>
+    <button class="navbtn" data-p="processo">Processo</button>
+    <button class="navbtn" data-p="diferenciais">Diferenciais</button>
     <button class="navbtn" data-p="testimonials">Depoimentos</button>
     <button class="navbtn" data-p="faq">FAQ</button>
     <button class="navbtn" data-p="contact">Contato</button>
+    <button class="navbtn" data-p="footer">Rodapé</button>
     <button class="navbtn" data-p="password">Senha</button>
     <div style="margin-top:auto">
       <a class="navbtn" href="/" target="_blank" style="text-decoration:none;display:block">↗ Ver o site</a>
@@ -93,15 +97,58 @@
     <section class="panel on" id="p-dash">
       <div class="topbar"><h1>Publicar</h1><span class="pill">SQLite · node:sqlite</span></div>
       <div class="card">
-        <p style="color:var(--muted)">As edições ficam salvas no banco. Quando estiver satisfeito, clique em <b>Publicar site</b>: o index, o portfólio, as páginas de case e o sitemap são regenerados na hora.</p>
+        <p style="color:var(--muted)">Cada seção do site tem seu próprio menu à esquerda. Edite, clique em <b>Salvar</b> na seção e, quando estiver tudo pronto, use <b>Publicar site</b> aqui: o index, o portfólio, as páginas de case e o sitemap são regerados na hora.</p>
         <button class="btn btn-grad mt" onclick="publishSite()">🚀 Publicar site</button>
         <p class="hint mt" id="pub-log"></p>
       </div>
     </section>
 
-    <!-- PORTFÓLIO -->
+    <!-- TOPO (HERO) -->
+    <section class="panel" id="p-hero">
+      <div class="topbar"><h1>Topo (Hero)</h1><button class="btn btn-grad" onclick="saveSettings()">Salvar</button></div>
+      <div class="card">
+        <label>Selo <span class="hint">HTML permitido</span></label><input id="s_hero_badge">
+        <label>Título <span class="hint">HTML — use &lt;span class="gradient-text"&gt; para o gradiente</span></label><textarea id="s_hero_title"></textarea>
+        <label>Subtítulo <span class="hint">HTML permitido</span></label><textarea id="s_hero_lead"></textarea>
+        <label>Métricas <span class="hint">uma por linha: numero | texto</span></label><textarea id="s_stats"></textarea>
+      </div>
+    </section>
+
+    <!-- TECNOLOGIAS (MARQUEE) -->
+    <section class="panel" id="p-marquee">
+      <div class="topbar"><h1>Tecnologias (faixa animada)</h1><button class="btn btn-grad" onclick="saveSettings()">Salvar</button></div>
+      <div class="card">
+        <label>Tecnologias <span class="hint">uma por linha — aparecem rolando abaixo do topo</span></label>
+        <textarea id="s_marquee_items" style="min-height:180px"></textarea>
+      </div>
+    </section>
+
+    <!-- SERVIÇOS -->
+    <section class="panel" id="p-services">
+      <div class="topbar"><h1>Serviços</h1><button class="btn btn-ghost" onclick="addRow('services')">+ Novo serviço</button></div>
+      <div class="card">
+        <h3 class="mb">Cabeçalho da seção</h3>
+        <label>Rótulo (eyebrow)</label><input id="s_serv_eyebrow">
+        <label>Título</label><input id="s_serv_title">
+        <label>Texto de apoio</label><textarea id="s_serv_lead"></textarea>
+        <h3 class="mb" style="margin-top:1rem">Card final "chamada para ação"</h3>
+        <label>Título</label><input id="s_serv_cta_title">
+        <label>Texto</label><textarea id="s_serv_cta_text"></textarea>
+        <label>Texto do link</label><input id="s_serv_cta_label">
+        <div class="right mt"><button class="btn btn-grad" onclick="saveSettings()">Salvar cabeçalho</button></div>
+      </div>
+      <div id="services-list"></div>
+    </section>
+
+    <!-- PROJETOS -->
     <section class="panel" id="p-projects">
-      <div class="topbar"><h1>Portfólio</h1><button class="btn btn-ghost" onclick="editProject(null)">+ Novo projeto</button></div>
+      <div class="topbar"><h1>Projetos</h1><button class="btn btn-ghost" onclick="editProject(null)">+ Novo projeto</button></div>
+      <div class="card">
+        <h3 class="mb">Cabeçalho da seção</h3>
+        <label>Rótulo (eyebrow)</label><input id="s_proj_eyebrow">
+        <label>Título</label><input id="s_proj_title">
+        <div class="right mt"><button class="btn btn-grad" onclick="saveSettings()">Salvar cabeçalho</button></div>
+      </div>
       <div id="projects-list"></div>
       <div class="card" id="project-form" hidden>
         <h3 id="pf-title" class="mb">Editar projeto</h3>
@@ -138,53 +185,77 @@
       </div>
     </section>
 
-    <!-- SERVIÇOS -->
-    <section class="panel" id="p-services">
-      <div class="topbar"><h1>Serviços</h1><button class="btn btn-ghost" onclick="addRow('services')">+ Novo serviço</button></div>
-      <div id="services-list"></div>
+    <!-- PROCESSO -->
+    <section class="panel" id="p-processo">
+      <div class="topbar"><h1>Processo</h1><button class="btn btn-ghost" onclick="addRow('process')">+ Nova etapa</button></div>
+      <div class="card">
+        <h3 class="mb">Cabeçalho da seção</h3>
+        <label>Rótulo (eyebrow)</label><input id="s_proc_eyebrow">
+        <label>Título</label><input id="s_proc_title">
+        <div class="right mt"><button class="btn btn-grad" onclick="saveSettings()">Salvar cabeçalho</button></div>
+      </div>
+      <div id="process-list"></div>
     </section>
 
-    <!-- TEXTOS -->
-    <section class="panel" id="p-texts">
-      <div class="topbar"><h1>Textos do site</h1><button class="btn btn-grad" onclick="saveTexts()">Salvar textos</button></div>
+    <!-- DIFERENCIAIS -->
+    <section class="panel" id="p-diferenciais">
+      <div class="topbar"><h1>Diferenciais (Por que a LA)</h1><button class="btn btn-grad" onclick="saveSettings()">Salvar</button></div>
       <div class="card">
-        <h3>Topo (hero)</h3>
-        <label>Selo <span class="hint">HTML permitido</span></label><input id="s_hero_badge">
-        <label>Título <span class="hint">HTML permitido — use &lt;span class="gradient-text"&gt; para o gradiente</span></label><textarea id="s_hero_title"></textarea>
-        <label>Subtítulo <span class="hint">HTML permitido</span></label><textarea id="s_hero_lead"></textarea>
-        <label>Métricas <span class="hint">uma por linha: numero | texto</span></label><textarea id="s_stats"></textarea>
-      </div>
-      <div class="card">
-        <h3>Seção "Por que a LA"</h3>
+        <label>Rótulo (eyebrow)</label><input id="s_about_eyebrow">
+        <label>Número em destaque <span class="hint">o número gigante ao lado (ex.: 15)</span></label><input id="s_about_bignum">
         <label>Título</label><input id="s_about_title">
         <label>Texto</label><textarea id="s_about_lead"></textarea>
         <label>Bullets <span class="hint">um por linha</span></label><textarea id="s_about_bullets"></textarea>
-      </div>
-      <div class="card">
-        <h3>Rodapé</h3>
-        <label>Frase da marca</label><textarea id="s_footer_tagline"></textarea>
       </div>
     </section>
 
     <!-- DEPOIMENTOS -->
     <section class="panel" id="p-testimonials">
       <div class="topbar"><h1>Depoimentos</h1><button class="btn btn-ghost" onclick="addRow('testimonials')">+ Novo depoimento</button></div>
+      <div class="card">
+        <h3 class="mb">Cabeçalho da seção</h3>
+        <label>Rótulo (eyebrow)</label><input id="s_dep_eyebrow">
+        <label>Título</label><input id="s_dep_title">
+        <div class="right mt"><button class="btn btn-grad" onclick="saveSettings()">Salvar cabeçalho</button></div>
+      </div>
       <div id="testimonials-list"></div>
     </section>
 
     <!-- FAQ -->
     <section class="panel" id="p-faq">
       <div class="topbar"><h1>Perguntas frequentes</h1><button class="btn btn-ghost" onclick="addRow('faq')">+ Nova pergunta</button></div>
+      <div class="card">
+        <h3 class="mb">Cabeçalho da seção</h3>
+        <label>Rótulo (eyebrow)</label><input id="s_faq_eyebrow">
+        <label>Título</label><input id="s_faq_title">
+        <div class="right mt"><button class="btn btn-grad" onclick="saveSettings()">Salvar cabeçalho</button></div>
+      </div>
       <div id="faq-list"></div>
     </section>
 
     <!-- CONTATO -->
     <section class="panel" id="p-contact">
-      <div class="topbar"><h1>Dados de contato</h1><button class="btn btn-grad" onclick="saveTexts()">Salvar contato</button></div>
+      <div class="topbar"><h1>Contato</h1><button class="btn btn-grad" onclick="saveSettings()">Salvar</button></div>
       <div class="card">
+        <h3 class="mb">Chamada da seção</h3>
+        <label>Título <span class="hint">HTML — &lt;span class="gradient-text"&gt; para o gradiente</span></label><textarea id="s_contact_title"></textarea>
+        <label>Texto de apoio</label><textarea id="s_contact_lead"></textarea>
+      </div>
+      <div class="card">
+        <h3 class="mb">Dados de contato</h3>
+        <label>WhatsApp <span class="hint">recebe os briefings do formulário — só dígitos, com DDI+DDD (ex.: 5581971010607)</span></label><input id="s_whatsapp" inputmode="numeric" placeholder="5581971010607">
         <label>E-mail</label><input id="s_contact_email" type="email">
         <label>Tempo de resposta</label><input id="s_contact_response">
         <label>Atuação</label><input id="s_contact_area">
+      </div>
+    </section>
+
+    <!-- RODAPÉ -->
+    <section class="panel" id="p-footer">
+      <div class="topbar"><h1>Rodapé</h1><button class="btn btn-grad" onclick="saveSettings()">Salvar</button></div>
+      <div class="card">
+        <label>Frase da marca</label><textarea id="s_footer_tagline"></textarea>
+        <label>CNPJ</label><input id="s_cnpj" placeholder="00.000.000/0001-00">
       </div>
     </section>
 
@@ -247,15 +318,21 @@ document.querySelectorAll(".navbtn[data-p]").forEach((b) =>
 );
 
 /* ------------------------------ carregar --------------------------------- */
+// campos de texto simples são carregados/salvos por id (s_<chave>); estes 3 são listas
+const LIST_KEYS = ["stats", "about_bullets", "marquee_items"];
 async function loadAll() {
   DATA = await api("/api/content");
   DATA.projects = await api("/api/projects");
-  // textos
-  for (const k of ["hero_badge","hero_title","hero_lead","about_title","about_lead","footer_tagline","contact_email","contact_response","contact_area"])
-    $("#s_" + k).value = DATA.settings[k];
+  // preenche todo input/textarea de configuração pelo id (s_<chave>)
+  document.querySelectorAll('[id^="s_"]').forEach((el) => {
+    const k = el.id.slice(2);
+    if (!LIST_KEYS.includes(k) && DATA.settings[k] !== undefined) el.value = DATA.settings[k];
+  });
   $("#s_stats").value = JSON.parse(DATA.settings.stats || "[]").map((s) => `${s.num} | ${s.label}`).join("\n");
   $("#s_about_bullets").value = JSON.parse(DATA.settings.about_bullets || "[]").join("\n");
-  renderProjects(); renderTable("services"); renderTable("testimonials"); renderTable("faq");
+  $("#s_marquee_items").value = JSON.parse(DATA.settings.marquee_items || "[]").join("\n");
+  renderProjects();
+  ["services", "testimonials", "faq", "process"].forEach(renderTable);
 }
 
 /* ------------------------------ publicar --------------------------------- */
@@ -268,17 +345,18 @@ async function publishSite() {
   } catch (e) { $("#pub-log").textContent = ""; toast(e.message, true); }
 }
 
-/* ------------------------------ textos ----------------------------------- */
-async function saveTexts() {
+/* ------------------------------ configurações ---------------------------- */
+// salva TODOS os campos de configuração presentes na página (de qualquer aba)
+async function saveSettings() {
   const body = {};
-  for (const k of ["hero_badge","hero_title","hero_lead","about_title","about_lead","footer_tagline","contact_email","contact_response","contact_area"])
-    body[k] = $("#s_" + k).value;
+  document.querySelectorAll('[id^="s_"]').forEach((el) => { const k = el.id.slice(2); if (!LIST_KEYS.includes(k)) body[k] = el.value; });
   body.stats = JSON.stringify($("#s_stats").value.split("\n").filter(Boolean).map((l) => {
     const [num, ...rest] = l.split("|"); return { num: num.trim(), label: rest.join("|").trim() };
   }));
   body.about_bullets = JSON.stringify($("#s_about_bullets").value.split("\n").map((s) => s.trim()).filter(Boolean));
+  body.marquee_items = JSON.stringify($("#s_marquee_items").value.split("\n").map((s) => s.trim()).filter(Boolean));
   await api("/api/settings", "PUT", body);
-  toast("Textos salvos. Lembre de publicar!");
+  toast("Salvo. Lembre de publicar!");
 }
 
 /* ----------------------------- portfólio --------------------------------- */
@@ -343,6 +421,7 @@ const TDEFS = {
   services: { fields: [["title","Título","input"],["text","Descrição","textarea"],["tags","Tags (vírgula)","input"]], parse: (v,f)=> f==="tags" ? v.split(",").map(s=>s.trim()).filter(Boolean) : v, show: (r,f)=> f==="tags" ? JSON.parse(r.tags||"[]").join(", ") : (r[f]||"") },
   testimonials: { fields: [["text","Depoimento","textarea"],["name","Nome","input"],["role","Cargo/empresa","input"],["initials","Iniciais","input"]], parse: (v)=>v, show: (r,f)=> r[f]||"" },
   faq: { fields: [["question","Pergunta","input"],["answer","Resposta","textarea"]], parse: (v)=>v, show: (r,f)=> r[f]||"" },
+  process: { fields: [["title","Etapa","input"],["text","Descrição","textarea"]], parse: (v)=>v, show: (r,f)=> r[f]||"" },
 };
 function renderTable(t) {
   const def = TDEFS[t];
@@ -368,7 +447,8 @@ async function saveRow(t, id) {
 async function addRow(t) {
   const blank = { services: { title: "Novo serviço", text: "", tags: [] },
     testimonials: { text: "", name: "", role: "", initials: "" },
-    faq: { question: "Nova pergunta?", answer: "" } }[t];
+    faq: { question: "Nova pergunta?", answer: "" },
+    process: { title: "Nova etapa", text: "" } }[t];
   await api("/api/" + t, "POST", blank);
   DATA = Object.assign(DATA, await api("/api/content"));
   renderTable(t);

@@ -1,0 +1,19 @@
+{
+  "name": "la-software-house",
+  "version": "1.2.0",
+  "private": true,
+  "description": "Site e gerenciador de conteúdo da LA Software House (luizaugust.me).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "publicar": "node server.js --publicar",
+    "backup": "node server.js --backup",
+    "backup:status": "node server.js --backup-status"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.4.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

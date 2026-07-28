@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voltamos já — LA Software House</title>
+<meta name="robots" content="noindex, nofollow">
+<!--
+  Página servida pelo NGINX quando a aplicação não responde (deploy, restart,
+  queda). Precisa ser autossuficiente: CSS embutido, SVG inline, nenhuma fonte
+  ou imagem externa — se dependesse de /assets, o mesmo servidor que está fora
+  do ar teria de entregá-los.
+-->
+<style>
+  :root{--bg:#0b0b12;--surface:#14141f;--text:#f3f4fb;--muted:#9a9db1;
+        --violet:#7c5cff;--cyan:#24e3d6;--line:rgba(255,255,255,.08)}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       display:grid;place-items:center;padding:1.5rem;position:relative;overflow:hidden}
+  /* aurora do hero, em versão estática — dá a identidade sem depender de nada */
+  body::before{content:"";position:absolute;inset:-20%;pointer-events:none;
+    background:radial-gradient(45% 40% at 22% 18%,rgba(124,92,255,.30),transparent 60%),
+               radial-gradient(40% 38% at 78% 26%,rgba(36,227,214,.22),transparent 62%);
+    filter:blur(30px)}
+  .caixa{position:relative;width:min(560px,100%);background:var(--surface);
+    border:1px solid var(--line);border-radius:20px;padding:2.6rem 2.2rem;text-align:center;
+    box-shadow:0 30px 80px rgba(0,0,0,.5)}
+  .marca{display:flex;align-items:center;justify-content:center;gap:.7rem;margin-bottom:1.6rem}
+  .marca span{font-weight:700;font-size:1.05rem;letter-spacing:.01em}
+  .marca span b{background:linear-gradient(90deg,var(--cyan),var(--violet));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  h1{font-size:1.5rem;line-height:1.25;margin:0 0 .8rem;letter-spacing:-.02em}
+  p{color:var(--muted);margin:0 0 1rem}
+  .selo{display:inline-flex;align-items:center;gap:.5rem;margin-top:.6rem;
+    font:600 .74rem/1 ui-monospace,"Consolas",monospace;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--cyan);background:rgba(36,227,214,.10);border:1px solid rgba(36,227,214,.28);
+    border-radius:999px;padding:.5rem .9rem}
+  .ponto{width:7px;height:7px;border-radius:50%;background:var(--cyan);
+    animation:pulsa 1.6s ease-in-out infinite}
+  @keyframes pulsa{0%,100%{opacity:1}50%{opacity:.25}}
+  .rodape{margin-top:1.8rem;padding-top:1.2rem;border-top:1px solid var(--line);
+    color:#656879;font-size:.82rem}
+  .rodape a{color:var(--muted);text-decoration:none;border-bottom:1px solid var(--line)}
+  @media (prefers-reduced-motion:reduce){.ponto{animation:none}}
+</style>
+</head>
+<body>
+  <main class="caixa">
+    <div class="marca">
+      <!-- emblema "pilares": as 4 barras + o L da fundação -->
+      <svg width="42" height="42" viewBox="0 0 64 64" role="img" aria-label="LA Software House">
+        <defs>
+          <linearGradient id="g" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#2ee7da"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="64" height="64" rx="15" fill="#0e0e1a"/>
+        <rect x="16" y="17" width="6" height="30" rx="2" fill="#fff"/>
+        <rect x="16" y="41" width="21" height="6" rx="2" fill="#fff"/>
+        <rect x="30" y="27" width="6" height="12" rx="2" fill="url(#g)"/>
+        <rect x="39" y="21" width="6" height="18" rx="2" fill="url(#g)"/>
+        <rect x="48" y="31" width="6" height="16" rx="2" fill="url(#g)"/>
+      </svg>
+      <span><b>LA</b> Software House</span>
+    </div>
+
+    <h1>Estamos publicando uma atualização</h1>
+    <p>O site fica fora do ar por alguns instantes enquanto a nova versão sobe.
+       Atualize a página em um minuto.</p>
+
+    <span class="selo"><i class="ponto"></i> Manutenção em andamento</span>
+
+    <div class="rodape">
+      Precisa falar agora? <a href="https://wa.me/5581971010607">WhatsApp (81) 97101-0607</a>
+    </div>
+  </main>
+</body>
+</html>

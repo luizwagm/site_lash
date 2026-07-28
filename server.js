@@ -17,16 +17,18 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { execSync } = require("node:child_process");
-const { DatabaseSync } = require("node:sqlite");
+const { abrirBanco, DRIVER_NOME, DRIVER_AVISO } = require("./db");
+const { agendarBackups, rodarBackup, statusBackup } = require("./backup");
 
 const ROOT = __dirname;
-const PORT = 5180;
+const PORT = Number(process.env.PORT) || 5180;   // PORT por env permite subir cópia de teste
+const APP_VERSION = "1.2.0";
 const UPLOAD_DIR = path.join(ROOT, "assets", "img", "uploads");
 fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 /* ------------------------------- Banco ---------------------------------- */
-const db = new DatabaseSync(path.join(ROOT, "data", "site.db"));
+const db = abrirBanco(path.join(ROOT, "data", "site.db"));
 db.exec(`
   CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS projects (
@@ -43,9 +45,30 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS faq (
     id INTEGER PRIMARY KEY AUTOINCREMENT, question TEXT NOT NULL, answer TEXT NOT NULL, sort INTEGER DEFAULT 0
   );
+  CREATE TABLE IF NOT EXISTS process (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, text TEXT, sort INTEGER DEFAULT 0
+  );
 `);
 
+/* Senha do painel: scrypt com salt individual. Bancos antigos guardavam sha256
+   puro — verifyPass aceita os dois e o login migra o legado para scrypt. */
 const sha = (s) => crypto.createHash("sha256").update(String(s)).digest("hex");
+const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 32 };
+function hashPass(senha) {
+  const salt = crypto.randomBytes(16);
+  const dk = crypto.scryptSync(String(senha), salt, SCRYPT.keylen, SCRYPT);
+  return `scrypt$${SCRYPT.N}$${SCRYPT.r}$${SCRYPT.p}$${salt.toString("hex")}$${dk.toString("hex")}`;
+}
+const bufEq = (a, b) => a.length === b.length && crypto.timingSafeEqual(a, b);
+function verifyPass(senha, guardado) {
+  if (!guardado) return false;
+  if (guardado.startsWith("scrypt$")) {
+    const [, N, r, p, saltHex, dkHex] = guardado.split("$");
+    const dk = crypto.scryptSync(String(senha), Buffer.from(saltHex, "hex"), dkHex.length / 2, { N: +N, r: +r, p: +p });
+    return bufEq(Buffer.from(dkHex, "hex"), dk);
+  }
+  return /^[a-f0-9]{64}$/.test(guardado) && bufEq(Buffer.from(sha(senha), "hex"), Buffer.from(guardado, "hex"));
+}
 const getSetting = (k) => db.prepare("SELECT value FROM settings WHERE key=?").get(k)?.value;
 const setSetting = (k, v) =>
   db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(k, String(v));
@@ -54,7 +77,7 @@ const setSetting = (k, v) =>
 function seed() {
   if (getSetting("hero_title")) return;
   const S = {
-    admin_password_hash: sha("la-admin"),
+    admin_password_hash: hashPass("la-admin"),
     hero_badge: `<span class="dot" aria-hidden="true"></span> Disponível para novos projetos · <b>2026</b>`,
     hero_title: `Ideias viram <span class="gradient-text">software</span><br>que gera resultado.`,
     hero_lead: `Somos a <b>LA Software House</b>. Há 15 anos transformamos briefings em sites, portais, aplicativos e plataformas SaaS sob medida — do primeiro rascunho ao deploy em produção.`,
@@ -64,6 +87,19 @@ function seed() {
       { num: "BR+", label: "Brasil & exterior" },
       { num: "100", label: "/100 em performance" },
     ]),
+    marquee_items: JSON.stringify(["React", "Next.js", "Node", "TypeScript", "React Native", "Laravel", "PostgreSQL", "AWS", "Docker"]),
+    serv_eyebrow: "O que fazemos",
+    serv_title: "Software sob medida, de ponta a ponta.",
+    serv_lead: "Não empurramos template. Cada projeto é arquitetado para o seu objetivo, com código próprio, performance e escala.",
+    serv_cta_title: "Não sabe por onde começar?",
+    serv_cta_text: "A gente ajuda a definir o escopo, o melhor caminho técnico e o orçamento.",
+    serv_cta_label: "Conversar com um especialista",
+    proj_eyebrow: "Portfólio",
+    proj_title: "Projetos que foram do brief ao deploy.",
+    proc_eyebrow: "Como trabalhamos",
+    proc_title: "Um processo previsível, sem surpresas.",
+    about_eyebrow: "Por que a LA",
+    about_bignum: "15",
     about_title: "15 anos transformando código em resultado.",
     about_lead: "Tempo de mercado não se improvisa. Nesses 15 anos aprendemos a entregar software que funciona, escala e não vira dor de cabeça depois.",
     about_bullets: JSON.stringify([
@@ -72,12 +108,27 @@ function seed() {
       "Do brief ao deploy com uma equipe só — sem terceirizar o núcleo",
       "Atendimento para Brasil e exterior, em português e inglês",
     ]),
+    dep_eyebrow: "Confiança",
+    dep_title: "Quem contratou, recomenda.",
+    faq_eyebrow: "Perguntas frequentes",
+    faq_title: "O que todo mundo pergunta antes de começar.",
+    contact_title: `Vamos construir o seu <span class="gradient-text">próximo produto?</span>`,
+    contact_lead: "Conte o que você precisa. Respondemos em até 24h úteis com os próximos passos — sem compromisso.",
     contact_email: "contato@luizaugust.me",
     contact_response: "Até 24h úteis",
     contact_area: "Brasil & exterior · PT / EN",
+    whatsapp: "5581971010607",
     footer_tagline: "Software house com 15 anos de mercado. Sites, portais, aplicativos e SaaS sob medida — do brief ao deploy.",
   };
   for (const [k, v] of Object.entries(S)) setSetting(k, v);
+
+  const steps = [
+    ["Descoberta", "Entendemos o objetivo, o público e as regras de negócio. Escopo e orçamento claros."],
+    ["Arquitetura & Design", "Definimos a stack, a UX e o design. Você aprova antes de qualquer linha de código."],
+    ["Desenvolvimento", "Entregas em ciclos curtos, com ambiente de teste e você acompanhando a evolução."],
+    ["Deploy & Evolução", "Publicação, monitoramento e suporte contínuo. O produto vivo e sempre melhorando."],
+  ];
+  steps.forEach((s, i) => db.prepare("INSERT INTO process(title,text,sort) VALUES(?,?,?)").run(s[0], s[1], i));
 
   const svc = [
     ["Sites & Landing Pages", "Institucionais e páginas de alta conversão, com SEO técnico e performance de sobra.", ["SEO", "Core Web Vitals", "CMS"]],
@@ -116,14 +167,62 @@ function seed() {
   console.log("· Banco inicializado (seed). Senha do painel: la-admin");
 }
 seed();
+// migração leve: garante chaves novas em bancos já existentes (não sobrescreve o que existe)
+const NOVOS_DEFAULTS = {
+  cnpj: "00.000.000/0001-00",
+  whatsapp: "5581971010607",
+  marquee_items: JSON.stringify(["React", "Next.js", "Node", "TypeScript", "React Native", "Laravel", "PostgreSQL", "AWS", "Docker"]),
+  serv_eyebrow: "O que fazemos",
+  serv_title: "Software sob medida, de ponta a ponta.",
+  serv_lead: "Não empurramos template. Cada projeto é arquitetado para o seu objetivo, com código próprio, performance e escala.",
+  serv_cta_title: "Não sabe por onde começar?",
+  serv_cta_text: "A gente ajuda a definir o escopo, o melhor caminho técnico e o orçamento.",
+  serv_cta_label: "Conversar com um especialista",
+  proj_eyebrow: "Portfólio",
+  proj_title: "Projetos que foram do brief ao deploy.",
+  proc_eyebrow: "Como trabalhamos",
+  proc_title: "Um processo previsível, sem surpresas.",
+  about_eyebrow: "Por que a LA",
+  about_bignum: "15",
+  dep_eyebrow: "Confiança",
+  dep_title: "Quem contratou, recomenda.",
+  faq_eyebrow: "Perguntas frequentes",
+  faq_title: "O que todo mundo pergunta antes de começar.",
+  contact_title: `Vamos construir o seu <span class="gradient-text">próximo produto?</span>`,
+  contact_lead: "Conte o que você precisa. Respondemos em até 24h úteis com os próximos passos — sem compromisso.",
+};
+for (const [k, v] of Object.entries(NOVOS_DEFAULTS)) if (getSetting(k) === undefined) setSetting(k, v);
+// processo: se a tabela estiver vazia, semeia as 4 etapas padrão
+if (db.prepare("SELECT COUNT(*) c FROM process").get().c === 0) {
+  [["Descoberta", "Entendemos o objetivo, o público e as regras de negócio. Escopo e orçamento claros."],
+   ["Arquitetura & Design", "Definimos a stack, a UX e o design. Você aprova antes de qualquer linha de código."],
+   ["Desenvolvimento", "Entregas em ciclos curtos, com ambiente de teste e você acompanhando a evolução."],
+   ["Deploy & Evolução", "Publicação, monitoramento e suporte contínuo. O produto vivo e sempre melhorando."]]
+    .forEach((s, i) => db.prepare("INSERT INTO process(title,text,sort) VALUES(?,?,?)").run(s[0], s[1], i));
+}
 
 /* ------------------------------- Sessões --------------------------------- */
-const sessions = new Map();
+const SESSION_HORAS = 12;
+const sessions = new Map();   // sid -> timestamp da última atividade
 const newToken = () => crypto.randomBytes(24).toString("hex");
+const sidDe = (req) => (/(?:^|;\s*)sid=([a-f0-9]+)/.exec(req.headers.cookie || "") || [])[1];
 function authed(req) {
-  const m = /(?:^|;\s*)sid=([a-f0-9]+)/.exec(req.headers.cookie || "");
-  return m && sessions.has(m[1]);
+  const sid = sidDe(req); if (!sid) return false;
+  const ts = sessions.get(sid); if (!ts) return false;
+  if (Date.now() - ts > SESSION_HORAS * 3600e3) { sessions.delete(sid); return false; }
+  sessions.set(sid, Date.now());   // renova por atividade
+  return true;
 }
+setInterval(() => { const lim = Date.now() - SESSION_HORAS * 3600e3; for (const [k, v] of sessions) if (v < lim) sessions.delete(k); }, 30 * 60e3).unref();
+const cookieSid = (t, req) => `sid=${t}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_HORAS * 3600}` +
+  (String(req.headers["x-forwarded-proto"]) === "https" ? "; Secure" : "");
+
+/* Trava de força bruta por IP: 5 tentativas / 15 min */
+const TENT_MAX = 5, BLOQ_MIN = 15, tentativas = new Map();
+const clientIp = (req) => String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket.remoteAddress || "";
+function bloqueado(ip) { const t = tentativas.get(ip); if (!t) return false; if (Date.now() - t.ts > BLOQ_MIN * 60e3) { tentativas.delete(ip); return false; } return t.n >= TENT_MAX; }
+function erroLogin(ip) { const t = tentativas.get(ip) || { n: 0, ts: Date.now() }; t.n++; t.ts = Date.now(); tentativas.set(ip, t); }
+const CSP_PAINEL = "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self'; base-uri 'self'; form-action 'self'";
 
 /* --------------------------- Render (publicação) ------------------------- */
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -143,10 +242,21 @@ function renderAll() {
   const services = db.prepare("SELECT * FROM services ORDER BY sort,id").all();
   const testimonials = db.prepare("SELECT * FROM testimonials ORDER BY sort,id").all();
   const faq = db.prepare("SELECT * FROM faq ORDER BY sort,id").all();
+  const steps = db.prepare("SELECT * FROM process ORDER BY sort,id").all();
 
   const stats = JSON.parse(S.stats || "[]")
     .map((s) => `<div class="stat"><dd class="stat__num gradient-text">${esc(s.num)}</dd><dt class="stat__label">${esc(s.label)}</dt></div>`)
     .join("\n            ");
+
+  // marquee de tecnologias — a linha é duplicada para o loop contínuo do CSS
+  const mq = JSON.parse(S.marquee_items || "[]");
+  const mqOne = mq.map((t) => `<span class="marquee__item">${esc(t)}</span>`).join("");
+  const marqueeHtml = `<div class="marquee__row">\n        ${mqOne}\n        ${mqOne}\n      </div>`;
+
+  const stepsHtml = steps.map((s, i) => {
+    const delay = i % 4 ? ` data-reveal-delay="${i % 4}"` : "";
+    return `<div class="step" data-reveal${delay}><div class="step__num"></div><h3 class="step__title">${esc(s.title)}</h3><p class="step__text">${esc(s.text)}</p></div>`;
+  }).join("\n          ");
 
   const servicesHtml = services.map((s, i) => {
     const tags = JSON.parse(s.tags || "[]").map((t) => `<span class="tag">${esc(t)}</span>`).join("");
@@ -158,9 +268,9 @@ function renderAll() {
             <div class="service__tags">${tags}</div>
           </article>`;
   }).join("\n          ") + `\n          <article class="card" data-reveal data-reveal-delay="2" style="background:linear-gradient(150deg,rgba(124,92,255,.16),rgba(36,227,214,.1));display:flex;flex-direction:column;justify-content:center">
-            <h3 class="service__title">Não sabe por onde começar?</h3>
-            <p class="service__text">A gente ajuda a definir o escopo, o melhor caminho técnico e o orçamento.</p>
-            <a class="link-arrow mt-xl" href="#contato">Conversar com um especialista
+            <h3 class="service__title">${esc(S.serv_cta_title || "")}</h3>
+            <p class="service__text">${esc(S.serv_cta_text || "")}</p>
+            <a class="link-arrow mt-xl" href="#contato">${esc(S.serv_cta_label || "")}
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
           </article>`;
 
@@ -220,13 +330,14 @@ function renderAll() {
   };
   const jsonldHtml = `<script type="application/ld+json">\n  ${JSON.stringify(jsonld, null, 2).replace(/\n/g, "\n  ")}\n  </script>`;
 
-  return { S, stats, servicesHtml, bullets, testimonialsHtml, faqHtml, contactSide, footerContact, jsonldHtml };
+  return { S, stats, marqueeHtml, servicesHtml, stepsHtml, bullets, testimonialsHtml, faqHtml, contactSide, footerContact, jsonldHtml };
 }
 
 function setMarker(html, key, content) {
   const re = new RegExp(`(<!--#${key}-->)[\\s\\S]*?(<!--\\/${key}-->)`);
   if (!re.test(html)) throw new Error(`Marcador ${key} não encontrado no index.html`);
-  return html.replace(re, `$1\n${content}\n$2`);
+  // replacement em função: evita que "$" no conteúdo seja interpretado ($$, $1…)
+  return html.replace(re, (_m, open, close) => `${open}\n${content}\n${close}`);
 }
 
 function publish() {
@@ -238,15 +349,33 @@ function publish() {
   html = setMarker(html, "HERO_TITLE", "            " + r.S.hero_title);
   html = setMarker(html, "HERO_LEAD", "            " + r.S.hero_lead);
   html = setMarker(html, "STATS", "            " + r.stats);
+  html = setMarker(html, "MARQUEE", "      " + r.marqueeHtml);
+  html = setMarker(html, "SERV_EYEBROW", r.S.serv_eyebrow);
+  html = setMarker(html, "SERV_TITLE", r.S.serv_title);
+  html = setMarker(html, "SERV_LEAD", r.S.serv_lead);
   html = setMarker(html, "SERVICES", "          " + r.servicesHtml);
+  html = setMarker(html, "PROJ_EYEBROW", r.S.proj_eyebrow);
+  html = setMarker(html, "PROJ_TITLE", r.S.proj_title);
+  html = setMarker(html, "PROC_EYEBROW", r.S.proc_eyebrow);
+  html = setMarker(html, "PROC_TITLE", r.S.proc_title);
+  html = setMarker(html, "PROC_STEPS", "          " + r.stepsHtml);
+  html = setMarker(html, "ABOUT_EYEBROW", r.S.about_eyebrow);
+  html = setMarker(html, "ABOUT_BIGNUM", r.S.about_bignum);
   html = setMarker(html, "ABOUT_TITLE", r.S.about_title);
   html = setMarker(html, "ABOUT_LEAD", r.S.about_lead);
   html = setMarker(html, "ABOUT_BULLETS", "            " + r.bullets);
+  html = setMarker(html, "DEP_EYEBROW", r.S.dep_eyebrow);
+  html = setMarker(html, "DEP_TITLE", r.S.dep_title);
   html = setMarker(html, "TESTIMONIALS", "          " + r.testimonialsHtml);
+  html = setMarker(html, "FAQ_EYEBROW", r.S.faq_eyebrow);
+  html = setMarker(html, "FAQ_TITLE", r.S.faq_title);
   html = setMarker(html, "FAQ_ITEMS", "          " + r.faqHtml);
+  html = setMarker(html, "CONTACT_TITLE", r.S.contact_title);
+  html = setMarker(html, "CONTACT_LEAD", r.S.contact_lead);
   html = setMarker(html, "CONTACT_SIDE", "            " + r.contactSide);
   html = setMarker(html, "FOOTER_TAGLINE", r.S.footer_tagline);
   html = setMarker(html, "FOOTER_CONTACT", "            " + r.footerContact);
+  html = setMarker(html, "CNPJ", r.S.cnpj);
   fs.writeFileSync(idx, html);
 
   // projects.json
@@ -258,10 +387,11 @@ function publish() {
   }));
   fs.writeFileSync(path.join(ROOT, "assets/data/projects.json"), JSON.stringify(projects, null, 2));
 
-  // config.js (e-mail de contato)
+  // config.js (e-mail de contato + WhatsApp que recebe os briefings)
   const cfgPath = path.join(ROOT, "assets/js/config.js");
   let cfg = fs.readFileSync(cfgPath, "utf8");
   cfg = cfg.replace(/export const CONTACT_EMAIL = "[^"]*";/, `export const CONTACT_EMAIL = "${r.S.contact_email}";`);
+  cfg = cfg.replace(/export const WHATSAPP_NUMBER = "[^"]*";/, `export const WHATSAPP_NUMBER = "${(r.S.whatsapp || "").replace(/\D/g, "")}";`);
   fs.writeFileSync(cfgPath, cfg);
 
   // cases + sitemap
@@ -285,9 +415,18 @@ const TABLES = {
   services: ["title", "text", "tags", "sort"],
   testimonials: ["text", "name", "role", "initials", "sort"],
   faq: ["question", "answer", "sort"],
+  process: ["title", "text", "sort"],
 };
-const SETTING_KEYS = ["hero_badge", "hero_title", "hero_lead", "stats", "about_title", "about_lead", "about_bullets",
-  "contact_email", "contact_response", "contact_area", "footer_tagline"];
+const SETTING_KEYS = ["hero_badge", "hero_title", "hero_lead", "stats",
+  "marquee_items",
+  "serv_eyebrow", "serv_title", "serv_lead", "serv_cta_title", "serv_cta_text", "serv_cta_label",
+  "proj_eyebrow", "proj_title",
+  "proc_eyebrow", "proc_title",
+  "about_eyebrow", "about_bignum", "about_title", "about_lead", "about_bullets",
+  "dep_eyebrow", "dep_title",
+  "faq_eyebrow", "faq_title",
+  "contact_title", "contact_lead", "contact_email", "contact_response", "contact_area", "whatsapp",
+  "footer_tagline", "cnpj"];
 const PROJECT_COLS = ["id", "title", "category", "categoryLabel", "year", "badge", "client", "summary", "challenge",
   "solution", "results", "features", "stack", "image", "sort"];
 
@@ -298,15 +437,28 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const p = url.pathname;
 
+  // cabeçalhos de segurança em toda resposta
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  if (String(req.headers["x-forwarded-proto"]) === "https")
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+
   try {
     /* ------------------------------ API ---------------------------------- */
     if (p.startsWith("/api/")) {
       if (p === "/api/login" && req.method === "POST") {
+        const ip = clientIp(req);
+        if (bloqueado(ip)) return json(res, 429, { error: "Muitas tentativas. Tente novamente em 15 minutos." });
         const { password } = await readBody(req);
-        if (sha(password) !== getSetting("admin_password_hash")) return json(res, 401, { error: "Senha incorreta" });
+        const guardado = getSetting("admin_password_hash");
+        if (!verifyPass(password, guardado)) { erroLogin(ip); return json(res, 401, { error: "Senha incorreta" }); }
+        tentativas.delete(ip);
+        if (!String(guardado).startsWith("scrypt$")) setSetting("admin_password_hash", hashPass(password)); // migra sha256→scrypt
         const token = newToken();
         sessions.set(token, Date.now());
-        res.setHeader("Set-Cookie", `sid=${token}; HttpOnly; Path=/; SameSite=Lax`);
+        res.setHeader("Set-Cookie", cookieSid(token, req));
         return json(res, 200, { ok: true });
       }
       if (!authed(req)) return json(res, 401, { error: "Não autenticado" });
@@ -318,9 +470,11 @@ const server = http.createServer(async (req, res) => {
       }
       if (p === "/api/password" && req.method === "POST") {
         const { current, next } = await readBody(req);
-        if (sha(current) !== getSetting("admin_password_hash")) return json(res, 400, { error: "Senha atual incorreta" });
+        if (!verifyPass(current, getSetting("admin_password_hash"))) return json(res, 400, { error: "Senha atual incorreta" });
         if (!next || String(next).length < 6) return json(res, 400, { error: "Nova senha deve ter 6+ caracteres" });
-        setSetting("admin_password_hash", sha(next));
+        setSetting("admin_password_hash", hashPass(next));
+        const atual = sidDe(req);   // troca de senha derruba as outras sessões
+        for (const k of [...sessions.keys()]) if (k !== atual) sessions.delete(k);
         return json(res, 200, { ok: true });
       }
       if (p === "/api/content" && req.method === "GET") {
@@ -330,6 +484,7 @@ const server = http.createServer(async (req, res) => {
           services: db.prepare("SELECT * FROM services ORDER BY sort,id").all(),
           testimonials: db.prepare("SELECT * FROM testimonials ORDER BY sort,id").all(),
           faq: db.prepare("SELECT * FROM faq ORDER BY sort,id").all(),
+          process: db.prepare("SELECT * FROM process ORDER BY sort,id").all(),
         });
       }
       if (p === "/api/settings" && req.method === "PUT") {
@@ -367,7 +522,7 @@ const server = http.createServer(async (req, res) => {
         db.prepare("DELETE FROM projects WHERE id=?").run(pm[1]);
         return json(res, 200, { ok: true });
       }
-      const tm = p.match(/^\/api\/(services|testimonials|faq)(?:\/(\d+))?$/);
+      const tm = p.match(/^\/api\/(services|testimonials|faq|process)(?:\/(\d+))?$/);
       if (tm) {
         const table = tm[1], id = tm[2], cols = TABLES[table];
         if (req.method === "POST" && !id) {
@@ -391,10 +546,10 @@ const server = http.createServer(async (req, res) => {
       }
       if (p === "/api/upload" && req.method === "POST") {
         const { name, dataUrl } = await readBody(req);
-        const m = /^data:(image\/(?:png|jpe?g|webp|svg\+xml|gif));base64,(.+)$/.exec(dataUrl || "");
-        if (!m) return json(res, 400, { error: "Envie uma imagem (png, jpg, webp, svg ou gif)" });
+        const m = /^data:(image\/(?:png|jpe?g|webp|gif));base64,(.+)$/.exec(dataUrl || "");   // SVG fora — evita XSS armazenado
+        if (!m) return json(res, 400, { error: "Envie uma imagem (png, jpg, webp ou gif)" });
         const safe = slugify(path.parse(name || "foto").name).slice(0, 40) || "foto";
-        const ext = m[1] === "image/svg+xml" ? ".svg" : "." + m[1].split("/")[1].replace("jpeg", "jpg");
+        const ext = "." + m[1].split("/")[1].replace("jpeg", "jpg");
         const file = `${Date.now().toString(36)}-${safe}${ext}`;
         fs.writeFileSync(path.join(UPLOAD_DIR, file), Buffer.from(m[2], "base64"));
         return json(res, 200, { ok: true, path: `/assets/img/uploads/${file}` });
@@ -408,11 +563,22 @@ const server = http.createServer(async (req, res) => {
 
     /* --------------------------- Arquivos estáticos ----------------------- */
     if (p === "/admin" || p === "/admin/") {
-      res.writeHead(200, { "Content-Type": MIME[".html"] });
+      res.writeHead(200, { "Content-Type": MIME[".html"], "Content-Security-Policy": CSP_PAINEL, "Cache-Control": "no-store" });
       return res.end(fs.readFileSync(path.join(ROOT, "admin", "index.html")));
     }
-    // nunca servir o banco, o servidor ou as fontes
-    if (/^\/(data|server\.js|src)(\/|$)/.test(p)) { res.writeHead(404); return res.end("404"); }
+    /* Nunca servir dados sensíveis, código ou artefatos de deploy.
+       A regra do JavaScript é por LOCAL, não por nome: só `/assets/js/` é
+       público. Antes a lista citava `server.js` nominalmente e, ao surgirem
+       db.js, backup.js e build.js, os três passaram a ser baixáveis — um
+       bloqueio que precisa ser lembrado a cada arquivo novo já nasce furado. */
+    const dirProibido = /^\/(data|src|node_modules|nginx|backups)(\/|$)/.test(p);
+    const ocultoProibido = /(^|\/)\.[^/]/.test(p);                       // .git, .env, dotfiles
+    const extProibida = /\.(db|sqlite3?|sh|bash|service|env|conf|ini|sql|log|bak|old|orig|swp|tmp|pem|key|crt|lock|md)$/i.test(p);
+    const jsDeServidor = /\.js$/i.test(p) && !/^\/assets\/js\//i.test(p); // JS público mora em /assets/js/
+    const jsonDeServidor = /\.json$/i.test(p) && !/^\/assets\//i.test(p); // package.json, manifests internos
+    if (dirProibido || ocultoProibido || extProibida || jsDeServidor || jsonDeServidor) {
+      res.writeHead(404); return res.end("404");
+    }
 
     let file = path.normalize(path.join(ROOT, decodeURIComponent(p)));
     if (!file.startsWith(ROOT)) { res.writeHead(403); return res.end("403"); }
@@ -425,12 +591,61 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream" });
     res.end(fs.readFileSync(file));
   } catch (e) {
-    json(res, 500, { error: e.message });
+    /* Erro do CLIENTE (corpo malformado, payload gigante) é 400 e pode dizer o
+       motivo. Qualquer outra falha é 500 GENÉRICO: a mensagem de exceção
+       costuma revelar caminho de arquivo e estrutura interna, e isso é mapa
+       para quem estiver sondando. O detalhe vai só para o log do servidor. */
+    const doCliente = /JSON inválido|payload muito grande/i.test(e.message || "");
+    if (doCliente) return json(res, 400, { error: e.message });
+    console.error(`  ✖ erro em ${req.url}:`, e.message);
+    json(res, 500, { error: "Erro interno" });
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`\n  LA Software House — site + gerenciador`);
+/* CLI: `node server.js --publicar` regenera o site sem abrir o painel (usado no deploy) */
+if (process.argv.includes("--publicar")) {
+  const r = publish();
+  console.log("· Site publicado:", JSON.stringify(r));
+  process.exit(0);
+}
+
+/* Configuração do backup — usada tanto pela rotina automática quanto pelo
+   `node server.js --backup`, para que as duas gravem no mesmo lugar. */
+const BACKUP_CFG = {
+  destino: path.join(ROOT, "backups"),
+  bancos: [path.join(ROOT, "data", "site.db")],
+  intervaloHoras: Number(process.env.BACKUP_HORAS) || 24,
+  manter: Number(process.env.BACKUP_MANTER) || 30,
+};
+// `--backup` força uma cópia agora (o deploy.sh chama antes de mexer em algo)
+if (process.argv.includes("--backup")) {
+  process.exit(rodarBackup(BACKUP_CFG, "manual").length ? 0 : 1);
+}
+// `--backup-status` mostra a situação (usado pelo verificar.sh)
+if (process.argv.includes("--backup-status")) {
+  console.log(JSON.stringify(statusBackup(BACKUP_CFG), null, 2));
+  process.exit(0);
+}
+
+server.listen(PORT, process.env.HOST || "127.0.0.1", () => {
+  console.log(`\n  LA Software House — site + gerenciador v${APP_VERSION}`);
   console.log(`  · Site:   http://localhost:${PORT}/`);
-  console.log(`  · Painel: http://localhost:${PORT}/admin/  (senha inicial: la-admin)\n`);
+  console.log(`  · Painel: http://localhost:${PORT}/admin/`);
+  console.log(`  · Banco:  ${DRIVER_NOME}${DRIVER_AVISO ? " ⚠ " + DRIVER_AVISO : ""}`);
+  agendarBackups(BACKUP_CFG);
+
+  /* Testa a escrita no boot. Sem isto, um banco somente-leitura só aparece
+     quando o cliente tenta salvar algo pelo painel e nada acontece. */
+  try {
+    setSetting("_teste_escrita", String(Date.now()));
+    db.prepare("DELETE FROM settings WHERE key='_teste_escrita'").run();
+  } catch (e) {
+    const usuario = (() => { try { return require("node:os").userInfo().username; } catch { return "root"; } })();
+    console.error(`  ✖ BANCO SEM PERMISSÃO DE ESCRITA: ${e.message}`);
+    console.error(`    O painel não vai salvar nada. Corrija: sudo chown -R ${usuario}: "${ROOT}/data" "${ROOT}/assets/img/uploads"`);
+  }
+  // avisa sem imprimir a senha — este log vai parar no journalctl
+  if (verifyPass("la-admin", getSetting("admin_password_hash")))
+    console.log("  ⚠ A senha do painel ainda é a padrão. Troque em Painel → Senha antes de divulgar o site.\n");
+  else console.log("");
 });

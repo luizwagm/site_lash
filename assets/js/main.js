@@ -6,7 +6,7 @@
    - Formulário de contato (lead) mock
    ========================================================================== */
 
-import { CONTACT_EMAIL } from "./config.js";
+import { CONTACT_EMAIL, WHATSAPP_NUMBER } from "./config.js";
 
 const $ = (s, c = document) => c.querySelector(s);
 const $$ = (s, c = document) => [...c.querySelectorAll(s)];
@@ -131,13 +131,14 @@ function initContactForm() {
     e.preventDefault();
     if (!form.reportValidity()) return;
     const d = Object.fromEntries(new FormData(form).entries());
-    // Mock: monta um e-mail com o briefing (o cliente ainda não tem CRM/WhatsApp).
-    const subject = encodeURIComponent(`Novo projeto — ${d.nome} (${d.tipo})`);
-    const body = encodeURIComponent(
-      `Nome: ${d.nome}\nEmpresa: ${d.empresa || "-"}\nE-mail: ${d.email}\nTipo de projeto: ${d.tipo}\nOrçamento: ${d.orcamento || "-"}\n\nBriefing:\n${d.mensagem}`
+    // Envia o briefing pelo WhatsApp da LA.
+    const msg = encodeURIComponent(
+      `Olá! Quero um orçamento com a LA Software House.\n\n` +
+      `Nome: ${d.nome}\nEmpresa: ${d.empresa || "-"}\nE-mail: ${d.email}\n` +
+      `Tipo de projeto: ${d.tipo}\nOrçamento previsto: ${d.orcamento || "-"}\n\nBriefing:\n${d.mensagem}`
     );
-    window.location.href = `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`;
-    toast("Abrindo seu e-mail para enviar o briefing…");
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, "_blank", "noopener");
+    toast("Abrindo o WhatsApp para enviar o briefing…");
     form.reset();
   });
 }

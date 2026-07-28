@@ -1,0 +1,58 @@
+# ==========================================================================
+#  lash.service — LA Software House (luizaugust.me)
+#
+#  Instalar:
+#    sudo cp lash.service /etc/systemd/system/lash.service
+#    sudo systemctl daemon-reload
+#    sudo systemctl enable --now lash
+#    sudo systemctl status lash
+#
+#  O User daqui é quem precisa ser DONO de data/, backups/ e
+#  assets/img/uploads/ — o deploy.sh lê este campo para acertar as permissões
+#  sozinho. Trocar o User sem trocar o dono das pastas faz o painel parar de
+#  salvar com "attempt to write a readonly database".
+# ==========================================================================
+[Unit]
+Description=LA Software House — site e gerenciador (luizaugust.me)
+Documentation=https://github.com/luizwagm/site_lash
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/var/www/projetos/LA-Software-House
+ExecStart=/usr/bin/node server.js
+Environment=NODE_ENV=production
+# A aplicação escuta só em 127.0.0.1 (padrão do server.js); quem fala com o
+# mundo é o nginx. Não exponha esta porta no firewall.
+Environment=PORT=5180
+
+Restart=always
+RestartSec=3
+# Se o processo morre em ciclo (erro de sintaxe, banco corrompido), o systemd
+# desiste em vez de reiniciar para sempre — e o nginx passa a mostrar a página
+# de manutenção, que é uma tela honesta em vez de um 502 cru.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# --------------------------- endurecimento -----------------------------
+# O serviço só precisa ler o código e escrever na própria pasta.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+# ProtectSystem=full deixa /usr e /etc só-leitura; a pasta da app precisa
+# continuar gravável (banco, backups e uploads).
+ReadWritePaths=/var/www/projetos/LA-Software-House
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lash
+
+[Install]
+WantedBy=multi-user.target
