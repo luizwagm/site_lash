@@ -80,8 +80,10 @@
     <!-- CAPA -->
     <section class="section--tight" style="padding-top:0">
       <div class="container">
-        <div style="border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--line);aspect-ratio:21/9" data-reveal>
-          <img src="https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&amp;fit=crop&amp;w=1200&amp;q=70" alt="App de Delivery Regional" style="width:100%;height:100%;object-fit:cover" fetchpriority="high" decoding="async">
+        <!-- a proporção vem do CSS (.case-capa): 21/9 no desktop, mais alta no
+             celular — em tela estreita o 21/9 vira uma tira de poucos pixels -->
+        <div class="case-capa" data-reveal>
+          <img src="https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&amp;fit=crop&amp;w=1200&amp;q=70" alt="App de Delivery Regional" fetchpriority="high" decoding="async">
         </div>
       </div>
     </section>

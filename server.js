@@ -22,7 +22,11 @@ const { agendarBackups, rodarBackup, statusBackup } = require("./backup");
 
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT) || 5180;   // PORT por env permite subir cópia de teste
-const APP_VERSION = "1.2.0";
+/* Versão do site + gerenciador.
+   REGRA: feature nova sobe a 2ª casa (1.3.0, 1.4.0… pode passar de 10);
+   correção de bug sobe a 3ª (1.4.1, 1.4.2…, também sem teto).
+   A 1ª casa não muda. */
+const APP_VERSION = "1.4.1";
 const UPLOAD_DIR = path.join(ROOT, "assets", "img", "uploads");
 fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -69,8 +73,20 @@ function hashPass(senha) {
   return `scrypt$${SCRYPT.N}$${SCRYPT.r}$${SCRYPT.p}$${salt.toString("hex")}$${dk.toString("hex")}`;
 }
 const bufEq = (a, b) => a.length === b.length && crypto.timingSafeEqual(a, b);
+
+/* Hash descartável, só para GASTAR TEMPO. Quando não há senha configurada — ou
+   quando o registro guardado está corrompido —, o verifyPass devolveria `false`
+   na hora, em vez dos ~100ms que um scrypt custa. Essa diferença de tempo é
+   observável de fora e conta ao atacante em que estado o painel está antes de
+   ele tentar qualquer senha. Comparar contra a isca iguala o relógio. */
+let HASH_ISCA = null;
 function verifyPass(senha, guardado) {
-  if (!guardado) return false;
+  // sem senha configurada: ainda assim paga o custo de um scrypt, e devolve não
+  if (!guardado) {
+    if (!HASH_ISCA) HASH_ISCA = hashPass(crypto.randomBytes(16).toString("hex"));
+    verifyPass(senha, HASH_ISCA);
+    return false;
+  }
   if (guardado.startsWith("scrypt$")) {
     const [, N, r, p, saltHex, dkHex] = guardado.split("$");
     const dk = crypto.scryptSync(String(senha), Buffer.from(saltHex, "hex"), dkHex.length / 2, { N: +N, r: +r, p: +p });
@@ -223,6 +239,11 @@ function authed(req) {
   return true;
 }
 setInterval(() => { const lim = Date.now() - SESSION_HORAS * 3600e3; for (const [k, v] of sessions) if (v < lim) sessions.delete(k); }, 30 * 60e3).unref();
+/* Path=/ e não /admin porque a API mora em /api — os dois precisam do cookie.
+   (No BemEstar dá para isolar em /restrito porque lá a API fica sob o mesmo
+   caminho.) O HttpOnly impede leitura por JavaScript, o SameSite=Lax barra o
+   envio em requisição vinda de outro site, e o Secure só entra sob HTTPS —
+   sem ele o cookie viajaria em claro num acesso HTTP. */
 const cookieSid = (t, req) => `sid=${t}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_HORAS * 3600}` +
   (String(req.headers["x-forwarded-proto"]) === "https" ? "; Secure" : "");
 
@@ -231,7 +252,15 @@ const TENT_MAX = 5, BLOQ_MIN = 15, tentativas = new Map();
 const clientIp = (req) => String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket.remoteAddress || "";
 function bloqueado(ip) { const t = tentativas.get(ip); if (!t) return false; if (Date.now() - t.ts > BLOQ_MIN * 60e3) { tentativas.delete(ip); return false; } return t.n >= TENT_MAX; }
 function erroLogin(ip) { const t = tentativas.get(ip) || { n: 0, ts: Date.now() }; t.n++; t.ts = Date.now(); tentativas.set(ip, t); }
-const CSP_PAINEL = "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self'; base-uri 'self'; form-action 'self'";
+/* CSP do painel. `base-uri 'none'` impede que um <base> injetado reescreva o
+   destino de TODOS os links e formulários da página; `object-src 'none'` corta
+   plugins legados; `frame-ancestors 'none'` proíbe embutir o painel num iframe
+   — é a defesa contra clickjacking, e vale mais que o X-Frame-Options porque
+   não depende de o navegador ainda respeitar aquele cabeçalho antigo. */
+const CSP_PAINEL = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; " +
+  "img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+  "font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; " +
+  "connect-src 'self'; form-action 'self'";
 
 /* --------------------------- Render (publicação) ------------------------- */
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -415,7 +444,17 @@ const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "
   ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
   ".webp": "image/webp", ".webmanifest": "application/manifest+json", ".xml": "application/xml", ".txt": "text/plain", ".ico": "image/x-icon" };
 
-const json = (res, code, obj) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" }); res.end(JSON.stringify(obj)); };
+/* Toda resposta da API é privada: `no-store` impede que um proxy no caminho ou
+   o próprio navegador guardem conteúdo do painel em cache (e o entreguem depois
+   a outra pessoa no mesmo computador); `noindex` mantém a API fora de buscador. */
+const json = (res, code, obj) => {
+  res.writeHead(code, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    "X-Robots-Tag": "noindex, nofollow",
+  });
+  res.end(JSON.stringify(obj));
+};
 const readBody = (req) => new Promise((resolve, reject) => {
   let data = ""; let size = 0;
   req.on("data", (c) => { size += c.length; if (size > 25e6) { reject(new Error("payload muito grande")); req.destroy(); } data += c; });
@@ -525,7 +564,12 @@ const server = http.createServer(async (req, res) => {
       if (p === "/api/password" && req.method === "POST") {
         const { current, next } = await readBody(req);
         if (!verifyPass(current, getSetting("admin_password_hash"))) return json(res, 400, { error: "Senha atual incorreta" });
-        if (!next || String(next).length < 6) return json(res, 400, { error: "Nova senha deve ter 6+ caracteres" });
+        /* Mínimo de 8, como no /restrito da BemEstarClinic. E a senha padrão
+           fica proibida: a deste projeto já vazou no histórico do repositório,
+           então "trocar" para ela de novo não seria trocar nada. */
+        if (!next || String(next).length < 8) return json(res, 400, { error: "A nova senha precisa de 8 caracteres ou mais." });
+        if (String(next).trim().toLowerCase() === "la-admin")
+          return json(res, 400, { error: "Essa é a senha padrão e já é pública. Escolha outra." });
         setSetting("admin_password_hash", hashPass(next));
         const atual = sidDe(req);   // troca de senha derruba as outras sessões
         for (const k of [...sessions.keys()]) if (k !== atual) sessions.delete(k);
@@ -623,7 +667,13 @@ const server = http.createServer(async (req, res) => {
 
     /* --------------------------- Arquivos estáticos ----------------------- */
     if (p === "/admin" || p === "/admin/") {
-      res.writeHead(200, { "Content-Type": MIME[".html"], "Content-Security-Policy": CSP_PAINEL, "Cache-Control": "no-store" });
+      res.writeHead(200, {
+        "Content-Type": MIME[".html"],
+        "Content-Security-Policy": CSP_PAINEL,
+        "Cache-Control": "no-store",
+        // painel não entra em buscador: o robots.txt pede, isto obriga
+        "X-Robots-Tag": "noindex, nofollow",
+      });
       return res.end(fs.readFileSync(path.join(ROOT, "admin", "index.html")));
     }
     /* Nunca servir dados sensíveis, código ou artefatos de deploy.

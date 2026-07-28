@@ -267,8 +267,11 @@
     <section class="panel" id="p-password">
       <div class="topbar"><h1>Trocar senha</h1></div>
       <div class="card" style="max-width:420px">
+        <p class="hint" style="margin-bottom:1rem">A senha padrão deste projeto ficou registrada no histórico do repositório —
+          enquanto ela não for trocada, o painel está aberto para quem olhar o código.</p>
         <label>Senha atual</label><input type="password" id="pw_cur" autocomplete="current-password">
-        <label>Nova senha</label><input type="password" id="pw_new" autocomplete="new-password">
+        <label>Nova senha <span class="hint">mínimo 8 caracteres</span></label>
+        <input type="password" id="pw_new" autocomplete="new-password" minlength="8">
         <button class="btn btn-grad mt" onclick="changePw()">Salvar nova senha</button>
       </div>
     </section>

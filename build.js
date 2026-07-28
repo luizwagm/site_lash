@@ -71,10 +71,12 @@ projects.forEach((p, i) => {
      rel="noopener" porque abre em outra aba; "nofollow" para não passar
      autoridade de SEO do nosso domínio para o site do cliente. */
   const linkSite = p.url
-    ? `<a class="btn btn--ghost" href="${esc(p.url)}" target="_blank" rel="noopener nofollow">
-             Visitar o site
-             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg>
-           </a>`
+    ? `<div class="case-visitar">
+             <a class="btn btn--ghost" href="${esc(p.url)}" target="_blank" rel="noopener nofollow">
+               Visitar o site
+               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg>
+             </a>
+           </div>`
     : "";
   /* Na linha de crédito, o domínio limpo (sem https:// nem barra final) — é
      como as pessoas leem e escrevem um endereço. Vem com " · " na frente para

@@ -1,4 +1,9 @@
 User-agent: *
 Allow: /
 
+# O painel não deve aparecer em buscador. O robots.txt é um pedido; quem
+# obriga é o cabeçalho X-Robots-Tag que o servidor envia em /admin e /api.
+Disallow: /admin/
+Disallow: /api/
+
 Sitemap: https://luizaugust.me/sitemap.xml

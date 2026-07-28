@@ -174,6 +174,34 @@ p { text-wrap: pretty; }
 .section__title { font-size: var(--step-3); }
 .section__lead { margin-top: var(--sp-md); font-size: var(--step-1); color: var(--text-muted); }
 
+/* Botão "Visitar o site" do case: respiro em relação às tags da stack, que
+   ficam logo acima. Sem isto os dois blocos encostam e parecem um só. */
+.case-visitar { margin-top: var(--sp-lg); }
+
+/* --------------------------------------------------------------------------
+   CAPA DO CASE
+   O 21/9 funciona no desktop, onde a largura é grande. No celular a mesma
+   proporção transforma a imagem numa tira de ~90px: não dá para ver nada do
+   projeto e sobra vazio na tela. Por isso a proporção fica mais alta conforme
+   a tela estreita — a imagem cresce na vertical e volta a ser legível.
+   -------------------------------------------------------------------------- */
+.case-capa {
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  aspect-ratio: 21 / 9;
+}
+.case-capa img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+@media (max-width: 900px) { .case-capa { aspect-ratio: 16 / 10; } }
+@media (max-width: 640px) {
+  .case-capa { aspect-ratio: 4 / 5; }
+  /* em retrato, a captura de um site é mais alta que larga: enquadrar pelo
+     TOPO mostra o cabeçalho e o início da página, que é o que identifica o
+     projeto. `cover` centralizado cortaria justamente essa parte. */
+  .case-capa img { object-position: top center; }
+}
+
 /* --------------------------------------------------------------------------
    TEXTO RICO — campos do painel que aceitam marcação (desafio e solução do
    case). O conteúdo vem do editor, então os estilos precisam valer para o que
