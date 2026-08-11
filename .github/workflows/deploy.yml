@@ -1,0 +1,141 @@
+# ==========================================================================
+#  Entrega automática — LA Software House
+#
+#  Dois trabalhos em sequência: PROVAR e ENTREGAR. O segundo só existe se o
+#  primeiro passar (`needs`).
+#
+#  ESTE PROJETO NÃO TEM SUÍTE DE TESTES, e é honesto dizer o que isso
+#  significa: o portão aqui prova que o código COMPILA e que o servidor SOBE E
+#  RESPONDE — não que ele faz a coisa certa. É menos do que nos outros, e é o
+#  que existe. Quando houver bateria, ela entra aqui.
+#
+#  Mesmo assim vale: as três falhas que de fato derrubaram sites nesta frota
+#  foram erro de sintaxe (crase dentro de template literal), script com CRLF e
+#  servidor que não sobe. As três são pegas abaixo.
+#
+#  A CHAVE DESTE WORKFLOW NÃO DÁ SHELL: no servidor ela está presa a um
+#  `command=` com `restrict`, provado antes de ser ligada no deploy.
+# ==========================================================================
+name: Provar e entregar
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: entrega-lash
+  cancel-in-progress: false
+
+jobs:
+  provar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # A mesma linha do servidor. Provar em outra versão é provar outro
+      # programa.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar dependências
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: Todo JavaScript compila
+        run: |
+          erros=0
+          while IFS= read -r f; do
+            node --check "$f" || { echo "ERRO de sintaxe: $f"; erros=1; }
+          done < <(git ls-files '*.js' '*.cjs')
+          exit $erros
+
+      - name: Todo shell script compila
+        run: |
+          erros=0
+          while IFS= read -r f; do
+            bash -n "$f" || { echo "ERRO de sintaxe: $f"; erros=1; }
+          done < <(git ls-files '*.sh')
+          exit $erros
+
+      # Um `\r` no fim da linha faz o bash procurar o interpretador "bash\r" e
+      # morrer com "arquivo não encontrado" — apontando para um arquivo que
+      # existe. O .gitattributes previne; isto confere.
+      - name: Nenhum script com fim de linha do Windows
+        run: |
+          if git ls-files '*.sh' | xargs grep -lP '\r$' 2>/dev/null | grep .; then
+            echo "Os arquivos acima têm CRLF — o bash não roda assim."
+            exit 1
+          fi
+          echo "todos com LF"
+
+      # A prova que substitui a suíte que não existe: o servidor sobe com um
+      # banco recém-criado e responde. Pega require quebrado, coluna que a
+      # semeadura não criou, variável de ambiente faltando.
+      #
+      # Mata PELO PID guardado, nunca por pkill com o nome do comando: no
+      # servidor de produção todos os sites rodam a mesma linha com o mesmo
+      # usuário, e um pkill assim derrubou a Imobiliária inteira.
+      - name: O servidor sobe e responde
+        env:
+          PORT: 5297
+          HOST: 127.0.0.1
+        run: |
+          node server.js & PID=$!
+          for i in $(seq 1 25); do
+            CODIGO=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:5297/" || echo 000)
+            [ "$CODIGO" = "200" ] && break
+            sleep 1
+          done
+          kill "$PID" 2>/dev/null || true
+          if [ "$CODIGO" != "200" ]; then
+            echo "o servidor não respondeu 200 (veio $CODIGO)"
+            exit 1
+          fi
+          echo "servidor respondeu 200"
+
+  entregar:
+    needs: provar
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Preparar a chave e o host conhecido
+        env:
+          CHAVE: ${{ secrets.SSH_CHAVE_ENTREGA }}
+          HOST_CONHECIDO: ${{ secrets.SSH_HOST_CONHECIDO }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$CHAVE" > ~/.ssh/id_entrega
+          chmod 600 ~/.ssh/id_entrega
+          # Host FIXADO, não aceito na hora: com StrictHostKeyChecking=no,
+          # qualquer servidor que responda no meio do caminho receberia a
+          # conexão — e a chave junto.
+          printf '%s\n' "$HOST_CONHECIDO" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Pedir a entrega
+        env:
+          DESTINO: ${{ secrets.SSH_DESTINO }}
+        run: |
+          set -o pipefail
+          # Nenhum comando é enviado: o servidor ignora o que viesse aqui e roda
+          # o command= preso à chave.
+          ssh -T -i ~/.ssh/id_entrega \
+              -o BatchMode=yes -o ConnectTimeout=20 \
+              -o StrictHostKeyChecking=yes \
+              "$DESTINO" 2>&1 | tee saida-da-entrega.txt
+
+      - name: Guardar o log da entrega
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-da-entrega
+          path: saida-da-entrega.txt
+          retention-days: 30
+          if-no-files-found: ignore

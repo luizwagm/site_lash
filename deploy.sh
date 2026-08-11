@@ -28,6 +28,42 @@ COFRE="/tmp/lash-deploy-$$"
 
 cd "$APP_DIR" || { echo "Diretório $APP_DIR não existe"; exit 1; }
 
+# ==========================================================================
+#  ROOT OU O USUÁRIO DO SERVIÇO — e isto é decisão de segurança, não de gosto.
+#
+#  Este script VEM DO REPOSITÓRIO. Se a entrega automática o rodasse como root,
+#  quem invadisse o repositório deste site viraria dono do servidor inteiro:
+#  os onze sites, o Postgres e os certificados. Rodando como
+#  `deploy` — o mesmo usuário que já executa a aplicação —, o pior que um commit
+#  malicioso alcança é o próprio site, que é o poder que ele já tinha.
+#
+#  O que exige raiz é só parar e subir o serviço, e para isso existe uma regra
+#  de sudo com esses verbos e mais nada (ver ci/sudoers-lash).
+#
+#  `sudo ./deploy.sh` continua funcionando: aí já somos root e o sudo some.
+# ==========================================================================
+if [ "$(id -u)" = "0" ]; then
+  SC="systemctl"; SOU_ROOT=1
+else
+  SC="sudo -n systemctl"; SOU_ROOT=0
+  # A CONFERÊNCIA TEM DE USAR UM COMANDO DA LISTA. Antes eu testava com
+  # `sudo -n true` — e `true` não está autorizado, justamente porque a regra é
+  # estreita de propósito. Resultado: com a regra instalada e funcionando, o
+  # deploy parava dizendo que ela faltava.
+  #
+  # `is-active` está na lista. E a permissão é medida pelo que sai na SAÍDA
+  # PADRÃO, não pelo código de retorno: com o serviço parado ele devolve 3, o
+  # que é uma resposta legítima; quando o sudo recusa, a saída vem VAZIA porque
+  # o "a password is required" vai para a saída de erro.
+  if [ -z "$(sudo -n systemctl is-active "$SERVICO" 2>/dev/null)" ]; then
+    echo "PAREI: preciso de 'systemctl' sem senha e a regra de sudo não está instalada."
+    echo "  Instale uma vez, como root:"
+    echo "    sudo cp ci/sudoers-lash /etc/sudoers.d/lash && sudo chmod 440 /etc/sudoers.d/lash"
+    echo "  Ou rode com sudo:  sudo ./deploy.sh"
+    exit 1
+  fi
+fi
+
 azul()    { printf "\033[1;34m%s\033[0m\n" "$1"; }
 verde()   { printf "\033[1;32m%s\033[0m\n" "$1"; }
 amarelo() { printf "\033[1;33m%s\033[0m\n" "$1"; }
@@ -55,7 +91,7 @@ restaurar_e_sair() {
     mkdir -p data && cp "$BACKUP" data/site.db
     amarelo "Banco restaurado do backup: $BACKUP"
   fi
-  systemctl start "$SERVICO" 2>/dev/null
+  $SC start "$SERVICO" 2>/dev/null
   rm -rf "$COFRE"
   exit 1
 }
@@ -83,7 +119,7 @@ echo "     $ANTES"
 
 # ------------------------------------------------------------ 3. parar
 azul "3/9  Parando o serviço"
-systemctl stop "$SERVICO" 2>/dev/null
+$SC stop "$SERVICO" 2>/dev/null
 sleep 1
 verde "     parado (o SQLite solta o arquivo antes de mexermos nele)"
 
@@ -98,6 +134,29 @@ done
 verde "     guardados em $COFRE"
 
 # ------------------------------------------------------------- 5. pull
+# ------------------------------------- 4b. descartar o que o publish gerou
+#
+# O passo 8 REESCREVE, no lugar, arquivos que estão versionados: index.html,
+# assets/data/projects.json e sitemap.xml. Eles ficam como MODIFICADOS na
+# árvore, e `git pull --ff-only` recusa mexer em arquivo alterado — sem este
+# passo o deploy para antes mesmo de tentar o pull. Hoje são 3 no servidor.
+#
+# Descartar é seguro porque são DERIVADOS do banco: o passo 8 os refaz com o
+# conteúdo atual. O que NÃO é derivado (banco, imagens enviadas) já saiu do
+# caminho no passo 4.
+#
+# Só descarta o que o próprio servidor mudou (estado "M"), e diz quantos foram:
+# deploy que apaga arquivo em silêncio é deploy em que não se confia.
+azul "4b/9 Descartando as páginas geradas pelo Publicar"
+MODIFICADOS=$(git status --porcelain | awk '$1 == "M" { print $2 }')
+if [ -n "$MODIFICADOS" ]; then
+  QUANTOS=$(printf '%s\n' "$MODIFICADOS" | wc -l)
+  printf '%s\n' "$MODIFICADOS" | xargs -r git checkout --
+  verde "     $QUANTOS arquivos gerados descartados (refeitos no passo 8)"
+else
+  verde "     nada gerado pendente"
+fi
+
 azul "5/9  Baixando a versão nova"
 DE=$(git rev-parse --short HEAD)
 if ! git pull --ff-only; then
@@ -138,14 +197,17 @@ done
 
 # O dono precisa ser o usuário do serviço, não um palpite: com o dono errado o
 # SQLite responde "attempt to write a readonly database" e o painel não salva.
-DONO=$(systemctl show "$SERVICO" -p User --value 2>/dev/null); [ -z "$DONO" ] && DONO="root"
-GRUPO=$(systemctl show "$SERVICO" -p Group --value 2>/dev/null); [ -z "$GRUPO" ] && GRUPO="$DONO"
-chown -R "$DONO:$GRUPO" data assets/img/uploads backups 2>/dev/null
+DONO=$($SC show "$SERVICO" -p User --value 2>/dev/null); [ -z "$DONO" ] && DONO="root"
+GRUPO=$($SC show "$SERVICO" -p Group --value 2>/dev/null); [ -z "$GRUPO" ] && GRUPO="$DONO"
+# O chown só serve quando o deploy roda como ROOT: aí os arquivos nasceriam de
+# root e o serviço não conseguiria escrever. Rodando como o próprio dono, é
+# comando sem efeito que ainda por cima falha em alguns sistemas.
+if [ "$SOU_ROOT" = "1" ]; then chown -R "$DONO:$GRUPO" data assets/img/uploads backups 2>/dev/null; fi
 chmod 755 data assets/img/uploads 2>/dev/null
 [ -f data/site.db ] && chmod 644 data/site.db
 verde "     de volta no lugar (dono: $DONO:$GRUPO)"
 
-systemctl start "$SERVICO"
+$SC start "$SERVICO"
 sleep 3
 
 # -------------------------------------------------------- 8. publicar
