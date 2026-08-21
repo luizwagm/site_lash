@@ -26,7 +26,8 @@ const crypto = require("node:crypto");
 const { abrirBanco } = require("./db");
 
 const ROOT = __dirname;
-const SISTEMA_VERSION = "1.2.0";
+const SISTEMA_VERSION = "1.3.0";
+const APP_VERSION_SITE = require("./package.json").version;   // a versão do SITE, mostrada no menu
 const APP_DIR = path.join(ROOT, "restrito");
 
 /* Caminho do banco por env para a bateria de testes rodar num arquivo
@@ -48,7 +49,7 @@ db.exec(`
     email TEXT NOT NULL UNIQUE,
     nome TEXT,
     senha_hash TEXT NOT NULL,
-    papel TEXT NOT NULL DEFAULT 'admin' CHECK (papel IN ('admin','vendedor')),
+    papel TEXT NOT NULL DEFAULT 'admin' CHECK (papel IN ('admin','operador')),
     ativo INTEGER NOT NULL DEFAULT 1,
     ultimo_login TEXT,
     criado_em TEXT NOT NULL
@@ -163,7 +164,51 @@ db.exec(`
     ip TEXT,
     criado_em TEXT NOT NULL
   );
+  CREATE INDEX IF NOT EXISTS idx_auditoria_quando ON auditoria(criado_em);
+  -- acessos ao SITE público (página HTML servida); o server.js registra aqui
+  CREATE TABLE IF NOT EXISTS acessos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ip TEXT NOT NULL,
+    caminho TEXT NOT NULL,
+    ua TEXT,
+    referer TEXT,
+    dia TEXT NOT NULL,                 -- "YYYY-MM-DD" no fuso do negócio
+    criado_em TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_acessos_dia ON acessos(dia);
+  CREATE INDEX IF NOT EXISTS idx_acessos_ip ON acessos(ip);
+  -- onde cada IP está (resolvido em segundo plano, uma vez por IP)
+  CREATE TABLE IF NOT EXISTS geoip (
+    ip TEXT PRIMARY KEY,
+    ok INTEGER NOT NULL DEFAULT 0,
+    pais TEXT, pais_cod TEXT, uf TEXT, uf_cod TEXT, cidade TEXT,
+    lat REAL, lng REAL,
+    consultado_em TEXT NOT NULL
+  );
 `);
+
+/* Papel "vendedor" virou "operador" (nome que a agência usa). A CHECK de uma
+   tabela do SQLite não se altera — reconstrói a tabela uma vez, mantendo ids. */
+const defUsuarios = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='usuarios'").get()?.sql || "";
+if (/vendedor/.test(defUsuarios)) {
+  db.exec(`
+    CREATE TABLE usuarios_nova (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE,
+      nome TEXT,
+      senha_hash TEXT NOT NULL,
+      papel TEXT NOT NULL DEFAULT 'admin' CHECK (papel IN ('admin','operador')),
+      ativo INTEGER NOT NULL DEFAULT 1,
+      ultimo_login TEXT,
+      criado_em TEXT NOT NULL
+    );
+    INSERT INTO usuarios_nova(id,email,nome,senha_hash,papel,ativo,ultimo_login,criado_em)
+      SELECT id,email,nome,senha_hash, CASE WHEN papel='vendedor' THEN 'operador' ELSE papel END,
+             ativo,ultimo_login,criado_em FROM usuarios;
+    DROP TABLE usuarios;
+    ALTER TABLE usuarios_nova RENAME TO usuarios;
+  `);
+}
 db.prepare("INSERT OR IGNORE INTO canal(id) VALUES('wa')").run();
 
 /* Migração leve — o CREATE IF NOT EXISTS não altera tabela existente. */
@@ -247,8 +292,55 @@ const CONFIG_PADRAO = {
 };
 for (const [k, v] of Object.entries(CONFIG_PADRAO)) if (getCfg(k) === undefined) setCfg(k, v);
 
-const chaveAnthropic = () => process.env.ANTHROPIC_API_KEY || getCfg("anthropic_api_key") || "";
-const chavePlaces = () => process.env.GOOGLE_PLACES_API_KEY || getCfg("google_places_api_key") || "";
+/* ===========================================================================
+   SEGREDOS CIFRADOS EM REPOUSO — AES-256-GCM
+   As chaves de API ficavam em texto puro na tabela config: qualquer cópia do
+   gestao.db (backup, restic, um `scp` distraído) carregava a chave junto.
+   Agora o que vai ao banco é "enc:iv:tag:cifra", e a CHAVE-MESTRA fica fora
+   dele: na env GESTAO_CHAVE (systemd EnvironmentFile) ou, sem ela, num
+   arquivo data/gestao.chave (0600) gerado no primeiro boot. Quem levar só o
+   .db leva lixo. Migração transparente: valor antigo em claro é recifrado na
+   subida. (Trocar de arquivo para env depois de cifrar exige recadastrar as
+   chaves no painel — a antiga não abre mais, e o GET mostra "falta configurar".)
+   ========================================================================== */
+const CHAVE_ARQ = path.join(path.dirname(GESTAO_DB), "gestao.chave");
+let CHAVE_MESTRA = null;
+function chaveMestra() {
+  if (CHAVE_MESTRA) return CHAVE_MESTRA;
+  if (process.env.GESTAO_CHAVE) {
+    CHAVE_MESTRA = crypto.createHash("sha256").update(String(process.env.GESTAO_CHAVE)).digest();
+  } else {
+    if (!fs.existsSync(CHAVE_ARQ)) fs.writeFileSync(CHAVE_ARQ, crypto.randomBytes(32).toString("hex"), { mode: 0o600 });
+    CHAVE_MESTRA = Buffer.from(fs.readFileSync(CHAVE_ARQ, "utf8").trim(), "hex");
+  }
+  return CHAVE_MESTRA;
+}
+function cifrar(texto) {
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv("aes-256-gcm", chaveMestra(), iv);
+  const ct = Buffer.concat([c.update(String(texto), "utf8"), c.final()]);
+  return `enc:${iv.toString("hex")}:${c.getAuthTag().toString("hex")}:${ct.toString("hex")}`;
+}
+function decifrar(v) {
+  const s = String(v || "");
+  if (!s.startsWith("enc:")) return s;
+  try {
+    const [, ivHex, tagHex, ctHex] = s.split(":");
+    const d = crypto.createDecipheriv("aes-256-gcm", chaveMestra(), Buffer.from(ivHex, "hex"));
+    d.setAuthTag(Buffer.from(tagHex, "hex"));
+    return Buffer.concat([d.update(Buffer.from(ctHex, "hex")), d.final()]).toString("utf8");
+  } catch { return ""; }   // chave-mestra trocada: vale como "não configurada"
+}
+const SEGREDOS = ["anthropic_api_key", "google_places_api_key"];
+const getSegredo = (k) => decifrar(getCfg(k) || "");
+const setSegredo = (k, v) => setCfg(k, v ? cifrar(v) : "");
+for (const k of SEGREDOS) {   // migração: o que estava em claro vira cifrado agora
+  const v = getCfg(k);
+  if (v && !String(v).startsWith("enc:")) setSegredo(k, v);
+}
+
+const chaveAnthropic = () => process.env.ANTHROPIC_API_KEY || getSegredo("anthropic_api_key") || "";
+const chavePlaces = () => process.env.GOOGLE_PLACES_API_KEY || getSegredo("google_places_api_key") || "";
 const modeloIA = () => process.env.CLAUDE_MODEL || getCfg("ia_modelo") || "claude-sonnet-5";
 
 /* `Number(v) || padrao` engoliria o ZERO — e 0h é início de janela legítimo
@@ -304,7 +396,17 @@ const cookieRid = (t, req) => `rid=${t}; HttpOnly; Path=/restrito; SameSite=Lax;
    atacante distribuído em muitos IPs martelaria a mesma conta à vontade. */
 const TENT_MAX = 5, BLOQ_MIN = 15;
 const tentativas = new Map();   // chave ("ip:..."/"conta:...") -> { n, ts }
-const ipDe = (req) => String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket.remoteAddress || "";
+/* O IP de quem chamou. O nginx da casa põe `X-Real-IP: $remote_addr` — esse
+   é o confiável. O PRIMEIRO item do X-Forwarded-For é texto que o próprio
+   cliente pode mandar (já derrubou a trava de força bruta em outro site da
+   frota); se sobrar só ele, fica o ÚLTIMO item, que é o que o nosso proxy
+   anexou. */
+const ipDe = (req) => {
+  const real = String(req.headers["x-real-ip"] || "").trim();
+  if (real) return real;
+  const xff = String(req.headers["x-forwarded-for"] || "").split(",").map((s) => s.trim()).filter(Boolean);
+  return xff.length ? xff[xff.length - 1] : (req.socket.remoteAddress || "");
+};
 function travado(chave) {
   const t = tentativas.get(chave); if (!t) return false;
   if (Date.now() - t.ts > BLOQ_MIN * 60e3) { tentativas.delete(chave); return false; }
@@ -1150,6 +1252,122 @@ function diagnostico() {
 }
 
 /* ===========================================================================
+   ACESSOS AO SITE — contador, IPs e de onde vêm.
+   O server.js chama registrarAcesso() para cada página HTML servida ao
+   público. Robô não conta (o UA entrega). A geolocalização é resolvida em
+   SEGUNDO PLANO, uma vez por IP, num ritmo baixo — o visitante nunca espera
+   por ela. IP é dado pessoal: a retenção é de 90 dias, e o serviço de
+   geolocalização só recebe o IP (nada do que a pessoa viu).
+   ========================================================================== */
+const RETENCAO_ACESSOS_DIAS = 90;
+const ROBO_RE = /bot|crawl|spider|slurp|facebookexternalhit|whatsapp|telegram|preview|curl|wget|python-requests|go-http-client|headless|lighthouse|pingdom|uptime|monitor|scan/i;
+const IP_LOCAL_RE = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1$|::ffff:127\.|fc|fd|fe80|0\.0\.0\.0$)/i;
+
+function registrarAcesso(req, caminho) {
+  try {
+    const ua = String(req.headers["user-agent"] || "").slice(0, 300);
+    if (!ua || ROBO_RE.test(ua)) return;
+    const ip = ipDe(req);
+    if (!ip) return;
+    const cfg = lerConfigIA();
+    db.prepare("INSERT INTO acessos(ip,caminho,ua,referer,dia,criado_em) VALUES(?,?,?,?,?,?)")
+      .run(ip.slice(0, 64), String(caminho).slice(0, 200), ua, String(req.headers.referer || "").slice(0, 300), diaLocal(cfg.fuso), agora());
+  } catch (e) { console.error("  ✖ acesso:", e.message); }
+}
+
+/* IBGE código ↔ sigla — o mapa do IBGE identifica o estado pelo código. */
+const UF_IBGE = { RO: "11", AC: "12", AM: "13", RR: "14", PA: "15", AP: "16", TO: "17", MA: "21", PI: "22", CE: "23",
+  RN: "24", PB: "25", PE: "26", AL: "27", SE: "28", BA: "29", MG: "31", ES: "32", RJ: "33", SP: "35", PR: "41",
+  SC: "42", RS: "43", MS: "50", MT: "51", GO: "52", DF: "53" };
+const UF_POR_NOME = { rondonia: "RO", acre: "AC", amazonas: "AM", roraima: "RR", para: "PA", amapa: "AP", tocantins: "TO",
+  maranhao: "MA", piaui: "PI", ceara: "CE", "rio grande do norte": "RN", paraiba: "PB", pernambuco: "PE", alagoas: "AL",
+  sergipe: "SE", bahia: "BA", "minas gerais": "MG", "espirito santo": "ES", "rio de janeiro": "RJ", "sao paulo": "SP",
+  parana: "PR", "santa catarina": "SC", "rio grande do sul": "RS", "mato grosso do sul": "MS", "mato grosso": "MT",
+  goias: "GO", "distrito federal": "DF", "federal district": "DF" };
+const semAcentoSrv = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+
+async function resolverGeoip(ip) {
+  if (IP_LOCAL_RE.test(ip)) {
+    db.prepare("INSERT OR REPLACE INTO geoip(ip,ok,pais,pais_cod,consultado_em) VALUES(?,0,'rede local','',?)").run(ip, agora());
+    return;
+  }
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 8000);
+  try {
+    const r = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}`, { signal: ctl.signal });
+    const j = await r.json();
+    if (!j || j.success === false) {
+      db.prepare("INSERT OR REPLACE INTO geoip(ip,ok,pais,pais_cod,consultado_em) VALUES(?,0,?,?,?)")
+        .run(ip, String(j?.message || "desconhecido").slice(0, 60), "", agora());
+      return;
+    }
+    const sigla = j.country_code === "BR"
+      ? (UF_IBGE[String(j.region_code || "").toUpperCase()] ? String(j.region_code).toUpperCase() : UF_POR_NOME[semAcentoSrv(j.region)] || "")
+      : "";
+    db.prepare(`INSERT OR REPLACE INTO geoip(ip,ok,pais,pais_cod,uf,uf_cod,cidade,lat,lng,consultado_em)
+      VALUES(?,1,?,?,?,?,?,?,?,?)`)
+      .run(ip, j.country || "", j.country_code || "", sigla || (j.region || ""), sigla ? UF_IBGE[sigla] : "",
+        j.city || "", Number.isFinite(j.latitude) ? j.latitude : null, Number.isFinite(j.longitude) ? j.longitude : null, agora());
+  } catch (e) {
+    /* Falha de rede NÃO pode virar "desconhecido" permanente: fica sem linha
+       e a próxima rodada tenta de novo. */
+    console.error(`  ✖ geoip ${ip}:`, e.message);
+  } finally { clearTimeout(t); }
+}
+
+let servicosLigados = false;
+/* Só o server.js liga isto — o worker também carrega este módulo e não pode
+   virar um segundo resolvedor disputando a cota do serviço de geolocalização. */
+function iniciarServicos() {
+  if (servicosLigados) return;
+  servicosLigados = true;
+  let rodando = false;
+  setInterval(async () => {
+    if (rodando) return;
+    rodando = true;
+    try {
+      const pendentes = db.prepare(`SELECT DISTINCT a.ip FROM acessos a LEFT JOIN geoip g ON g.ip=a.ip
+        WHERE g.ip IS NULL ORDER BY a.id DESC LIMIT 12`).all();
+      for (const { ip } of pendentes) await resolverGeoip(ip);
+    } catch (e) { console.error("  ✖ resolvedor geoip:", e.message); }
+    rodando = false;
+  }, 60_000).unref();
+  // faxina da retenção: uma vez por hora
+  setInterval(() => {
+    try {
+      const lim = new Date(Date.now() - RETENCAO_ACESSOS_DIAS * 86400e3).toISOString();
+      db.prepare("DELETE FROM acessos WHERE criado_em < ?").run(lim);
+    } catch (e) { console.error("  ✖ retenção de acessos:", e.message); }
+  }, 3600e3).unref();
+}
+
+function estatisticasAcessos(dias) {
+  const cfg = lerConfigIA();
+  const hoje = diaLocal(cfg.fuso);
+  const desde = new Date(Date.now() - dias * 86400e3).toISOString();
+  const n = (sql, ...p) => db.prepare(sql).get(...p).c;
+  return {
+    dias,
+    hoje: { paginas: n("SELECT COUNT(*) c FROM acessos WHERE dia=?", hoje), visitantes: n("SELECT COUNT(DISTINCT ip) c FROM acessos WHERE dia=?", hoje) },
+    periodo: { paginas: n("SELECT COUNT(*) c FROM acessos WHERE criado_em>=?", desde), visitantes: n("SELECT COUNT(DISTINCT ip) c FROM acessos WHERE criado_em>=?", desde) },
+    total: { paginas: n("SELECT COUNT(*) c FROM acessos"), visitantes: n("SELECT COUNT(DISTINCT ip) c FROM acessos") },
+    porDia: db.prepare("SELECT dia, COUNT(*) paginas, COUNT(DISTINCT ip) visitantes FROM acessos WHERE criado_em>=? GROUP BY dia ORDER BY dia").all(desde),
+    paginas: db.prepare("SELECT caminho, COUNT(*) n FROM acessos WHERE criado_em>=? GROUP BY caminho ORDER BY n DESC LIMIT 15").all(desde),
+    ips: db.prepare(`SELECT a.ip, COUNT(*) n, MAX(a.criado_em) ultimo, g.pais, g.pais_cod, g.uf, g.cidade
+      FROM acessos a LEFT JOIN geoip g ON g.ip=a.ip WHERE a.criado_em>=? GROUP BY a.ip ORDER BY n DESC LIMIT 50`).all(desde),
+    porUf: db.prepare(`SELECT g.uf sigla, g.uf_cod codigo, COUNT(DISTINCT a.ip) visitantes, COUNT(*) paginas
+      FROM acessos a JOIN geoip g ON g.ip=a.ip WHERE a.criado_em>=? AND g.pais_cod='BR' AND g.uf_cod<>'' GROUP BY g.uf_cod`).all(desde),
+    porPais: db.prepare(`SELECT g.pais, g.pais_cod, COUNT(DISTINCT a.ip) visitantes, COUNT(*) paginas
+      FROM acessos a JOIN geoip g ON g.ip=a.ip WHERE a.criado_em>=? AND g.ok=1 GROUP BY g.pais_cod ORDER BY visitantes DESC`).all(desde),
+    pontos: db.prepare(`SELECT g.cidade, g.uf, g.pais_cod, g.lat, g.lng, COUNT(DISTINCT a.ip) visitantes
+      FROM acessos a JOIN geoip g ON g.ip=a.ip WHERE a.criado_em>=? AND g.lat IS NOT NULL GROUP BY g.cidade, g.uf, g.pais_cod`).all(desde),
+    semGeo: n("SELECT COUNT(DISTINCT a.ip) c FROM acessos a LEFT JOIN geoip g ON g.ip=a.ip WHERE a.criado_em>=? AND g.ip IS NULL", desde),
+    ultimos: db.prepare(`SELECT a.ip, a.caminho, a.referer, a.criado_em, g.pais_cod, g.uf, g.cidade
+      FROM acessos a LEFT JOIN geoip g ON g.ip=a.ip ORDER BY a.id DESC LIMIT 40`).all(),
+  };
+}
+
+/* ===========================================================================
    API — tudo sob /restrito/api/*. O porteiro é um só: fora de "entrar",
    nenhuma rota roda sem sessão.
    ========================================================================== */
@@ -1186,9 +1404,14 @@ async function rotaApi(req, res, rota) {
   const sessao = sessaoDe(req);
   if (!sessao) return json(res, 401, { error: "Não autenticado" });
 
-  if (rota === "eu") return json(res, 200, { ok: true, nome: sessao.nome, email: sessao.email, papel: sessao.papel, versao: SISTEMA_VERSION });
+  const admin = sessao.papel === "admin";
+  const soAdmin = () => json(res, 403, { error: "Só o administrador pode fazer isso" });
+
+  if (rota === "eu") return json(res, 200, { ok: true, id: sessao.usuarioId, nome: sessao.nome, email: sessao.email,
+    papel: sessao.papel, admin, versao: SISTEMA_VERSION, versaoSite: APP_VERSION_SITE });
   if (rota === "sair" && m === "POST") {
     sessoes.delete(ridDe(req));
+    auditar(sessao, "SAIR", "usuario", sessao.usuarioId, null, req);
     return json(res, 200, { ok: true });
   }
   if (rota === "senha" && m === "POST") {
@@ -1201,7 +1424,83 @@ async function rotaApi(req, res, rota) {
     db.prepare("UPDATE usuarios SET senha_hash=? WHERE id=?").run(hashSenha(nova), u.id);
     const rid = ridDe(req);   // troca de senha derruba as outras sessões deste usuário
     for (const [k, v] of sessoes) if (v.usuarioId === u.id && k !== rid) sessoes.delete(k);
+    auditar(sessao, "SENHA", "usuario", u.id, "Trocou a própria senha", req);
     return json(res, 200, { ok: true });
+  }
+
+  /* ------------------------------ Usuários ------------------------------- */
+  if (rota === "usuarios" && m === "GET") {
+    if (!admin) return soAdmin();
+    return json(res, 200, db.prepare("SELECT id,email,nome,papel,ativo,ultimo_login,criado_em FROM usuarios ORDER BY nome,email").all());
+  }
+  if (rota === "usuarios" && m === "POST") {
+    if (!admin) return soAdmin();
+    const b = await lerCorpo(req);
+    const email = String(b.email || "").trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(res, 400, { error: "E-mail inválido" });
+    if (!["admin", "operador"].includes(b.papel)) return json(res, 400, { error: "Perfil inválido (admin ou operador)" });
+    if (!b.senha || String(b.senha).length < 8) return json(res, 400, { error: "A senha inicial precisa de 8 caracteres ou mais" });
+    if (db.prepare("SELECT 1 FROM usuarios WHERE email=?").get(email)) return json(res, 400, { error: "Já existe usuário com esse e-mail" });
+    const r = db.prepare("INSERT INTO usuarios(email,nome,senha_hash,papel,ativo,criado_em) VALUES(?,?,?,?,1,?)")
+      .run(email, String(b.nome || "").trim(), hashSenha(b.senha), b.papel, agora());
+    auditar(sessao, "CRIAR", "usuario", r.lastInsertRowid, `Criou usuário ${email} (${b.papel})`, req);
+    return json(res, 200, { ok: true, id: Number(r.lastInsertRowid) });
+  }
+  const mu = rota.match(/^usuarios\/(\d+)$/);
+  if (mu && m === "PATCH") {
+    if (!admin) return soAdmin();
+    const u = db.prepare("SELECT * FROM usuarios WHERE id=?").get(mu[1]);
+    if (!u) return json(res, 404, { error: "Usuário não encontrado" });
+    const b = await lerCorpo(req);
+    const proprio = u.id === sessao.usuarioId;
+    const sets = []; const vals = []; const mudou = [];
+    if ("nome" in b) { sets.push("nome=?"); vals.push(String(b.nome || "").trim()); mudou.push("nome"); }
+    if ("papel" in b) {
+      if (!["admin", "operador"].includes(b.papel)) return json(res, 400, { error: "Perfil inválido" });
+      /* Rebaixar a si mesmo ou desativar-se trancaria a porta por dentro —
+         o último admin sairia e ninguém mais entraria para consertar. */
+      if (proprio && b.papel !== "admin") return json(res, 400, { error: "Você não pode rebaixar o próprio perfil" });
+      sets.push("papel=?"); vals.push(b.papel); mudou.push("perfil→" + b.papel);
+    }
+    if ("ativo" in b) {
+      if (proprio && !b.ativo) return json(res, 400, { error: "Você não pode desativar a própria conta" });
+      sets.push("ativo=?"); vals.push(b.ativo ? 1 : 0); mudou.push(b.ativo ? "ativado" : "desativado");
+      if (!b.ativo) for (const [k, v] of sessoes) if (v.usuarioId === u.id) sessoes.delete(k);   // derruba na hora
+    }
+    if (b.senha) {
+      if (String(b.senha).length < 8) return json(res, 400, { error: "A senha precisa de 8 caracteres ou mais" });
+      sets.push("senha_hash=?"); vals.push(hashSenha(b.senha)); mudou.push("senha redefinida");
+      for (const [k, v] of sessoes) if (v.usuarioId === u.id && k !== ridDe(req)) sessoes.delete(k);
+    }
+    if (sets.length) {
+      db.prepare(`UPDATE usuarios SET ${sets.join(",")} WHERE id=?`).run(...vals, u.id);
+      // sessão viva do usuário editado passa a refletir o papel/nome novos
+      for (const s of sessoes.values()) if (s.usuarioId === u.id) { if ("papel" in b) s.papel = b.papel; if ("nome" in b) s.nome = b.nome; }
+      auditar(sessao, "ATUALIZAR", "usuario", u.id, `Usuário ${u.email}: ${mudou.join(", ")}`, req);
+    }
+    return json(res, 200, { ok: true });
+  }
+
+  /* ------------------------------ Auditoria ------------------------------ */
+  if (rota === "auditoria" && m === "GET") {
+    if (!admin) return soAdmin();
+    const url = new URL(req.url, "http://x");
+    const limite = Math.min(200, Math.max(10, Number(url.searchParams.get("limite")) || 50));
+    const pagina = Math.max(1, Number(url.searchParams.get("pagina")) || 1);
+    const q = url.searchParams.get("q") || "";
+    const cond = q ? "WHERE usuario_email LIKE ? OR acao LIKE ? OR resumo LIKE ? OR entidade LIKE ?" : "";
+    const vals = q ? [`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`] : [];
+    const total = db.prepare(`SELECT COUNT(*) c FROM auditoria ${cond}`).get(...vals).c;
+    const linhas = db.prepare(`SELECT * FROM auditoria ${cond} ORDER BY id DESC LIMIT ? OFFSET ?`).all(...vals, limite, (pagina - 1) * limite);
+    return json(res, 200, { total, pagina, limite, linhas });
+  }
+
+  /* ------------------------------- Acessos ------------------------------- */
+  if (rota === "acessos" && m === "GET") {
+    if (!admin) return soAdmin();
+    const url = new URL(req.url, "http://x");
+    const dias = [7, 30, 90].includes(Number(url.searchParams.get("dias"))) ? Number(url.searchParams.get("dias")) : 30;
+    return json(res, 200, estatisticasAcessos(dias));
   }
 
   /* --------------------------------- Leads ------------------------------- */
@@ -1280,7 +1579,7 @@ async function rotaApi(req, res, rota) {
       return json(res, 200, { ok: true });
     }
     if (!ml[2] && m === "DELETE") {
-      if (sessao.papel !== "admin") return json(res, 403, { error: "Só o admin exclui leads" });
+      if (!admin) return soAdmin();
       const conversa = db.prepare("SELECT id FROM conversas WHERE lead_id=?").get(lead.id);
       if (conversa) db.prepare("DELETE FROM mensagens WHERE conversa_id=?").run(conversa.id);
       db.prepare("DELETE FROM conversas WHERE lead_id=?").run(lead.id);
@@ -1344,15 +1643,21 @@ async function rotaApi(req, res, rota) {
     return json(res, 200, { itens, total: itens.length, disponiveis: itens.filter((i) => !i.bloqueio).length });
   }
   if (rota === "prospeccao/lotes" && m === "GET") {
-    const lotes = db.prepare("SELECT * FROM lotes ORDER BY criado_em DESC LIMIT 50").all().map((l) => ({
+    const url = new URL(req.url, "http://x");
+    const limite = Math.min(50, Math.max(5, Number(url.searchParams.get("limite")) || 10));
+    const pagina = Math.max(1, Number(url.searchParams.get("pagina")) || 1);
+    const total = db.prepare("SELECT COUNT(*) c FROM lotes").get().c;
+    const linhas = db.prepare("SELECT * FROM lotes ORDER BY criado_em DESC LIMIT ? OFFSET ?").all(limite, (pagina - 1) * limite).map((l) => ({
       ...l,
       tarefas: db.prepare("SELECT status, COUNT(*) c FROM tarefas WHERE lote_id=? GROUP BY status").all(l.id)
         .reduce((acc, r) => ({ ...acc, [r.status]: r.c }), {}),
     }));
-    return json(res, 200, lotes);
+    return json(res, 200, { total, pagina, limite, linhas });
   }
+  /* Agendar e cancelar são do OPERADOR também — é o trabalho dele. O que
+     fica só com o administrador é o que muda o comportamento do sistema:
+     configuração da IA, conexão do número, usuários, auditoria, acessos. */
   if (rota === "prospeccao/lotes" && m === "POST") {
-    if (sessao.papel !== "admin") return json(res, 403, { error: "Só o admin agenda prospecção" });
     const { leadIds, quando, nota } = await lerCorpo(req);
     if (!Array.isArray(leadIds) || !leadIds.length) return json(res, 400, { error: "Selecione ao menos uma empresa." });
     if (leadIds.length > 200) return json(res, 400, { error: "Máximo de 200 empresas por lote." });
@@ -1364,7 +1669,6 @@ async function rotaApi(req, res, rota) {
   }
   const mlote = rota.match(/^prospeccao\/lotes\/(\d+)$/);
   if (mlote && m === "DELETE") {
-    if (sessao.papel !== "admin") return json(res, 403, { error: "Só o admin cancela prospecção" });
     const lote = db.prepare("SELECT * FROM lotes WHERE id=?").get(mlote[1]);
     if (!lote) return json(res, 404, { error: "Lote não encontrado" });
     /* Só mexe no que ainda NÃO saiu: PENDENTE vira CANCELADO. O que já foi
@@ -1425,6 +1729,7 @@ async function rotaApi(req, res, rota) {
   }
   if (rota === "prospeccao/diagnostico" && m === "GET") return json(res, 200, diagnostico());
   if (rota === "prospeccao/config" && m === "GET") {
+    if (!admin) return soAdmin();
     const cfg = lerConfigIA();
     return json(res, 200, {
       ...cfg,
@@ -1436,7 +1741,7 @@ async function rotaApi(req, res, rota) {
     });
   }
   if (rota === "prospeccao/config" && m === "PUT") {
-    if (sessao.papel !== "admin") return json(res, 403, { error: "Só o admin altera a configuração" });
+    if (!admin) return soAdmin();
     const b = await lerCorpo(req);
     const antes = lerConfigIA();
     if ("ia_ligada" in b) setCfg("ia_ligada", b.ia_ligada ? "1" : "0");
@@ -1453,8 +1758,8 @@ async function rotaApi(req, res, rota) {
     if ("fim_de_semana" in b) setCfg("fim_de_semana", b.fim_de_semana ? "1" : "0");
     if ("base_url" in b && /^https?:\/\//.test(String(b.base_url))) setCfg("base_url", String(b.base_url).replace(/\/+$/, ""));
     // chave vazia = "não mexer" (o GET nunca devolve a chave pro form reenviar)
-    if (b.anthropic_api_key) setCfg("anthropic_api_key", String(b.anthropic_api_key).trim());
-    if (b.google_places_api_key) setCfg("google_places_api_key", String(b.google_places_api_key).trim());
+    if (b.anthropic_api_key) setSegredo("anthropic_api_key", String(b.anthropic_api_key).trim());
+    if (b.google_places_api_key) setSegredo("google_places_api_key", String(b.google_places_api_key).trim());
     const depois = lerConfigIA();
     if (antes.ligada !== depois.ligada)
       auditar(sessao, "ATUALIZAR", "config", "ia_ligada", `Automação ${depois.ligada ? "LIGADA" : "desligada"}`, req);
@@ -1473,7 +1778,7 @@ async function rotaApi(req, res, rota) {
     });
   }
   if (rota === "prospeccao/canal" && m === "POST") {
-    if (sessao.papel !== "admin") return json(res, 403, { error: "Só o admin mexe na conexão" });
+    if (!admin) return soAdmin();
     const { acao } = await lerCorpo(req);
     if (acao !== "desconectar") return json(res, 400, { error: "Ação inválida" });
     db.prepare("UPDATE canal SET sair_solicitado=1 WHERE id='wa'").run();
@@ -1512,6 +1817,14 @@ function handleRestrito(req, res, pathname) {
     });
     return true;
   }
+  /* O mapa do Brasil (IBGE) só sai para quem está logado: é arquivo do
+     painel, não do site. Servido daqui e não pelo estático de propósito. */
+  if (rota === "mapa-brasil.svg") {
+    if (!sessaoDe(req)) { json(res, 401, { error: "Não autenticado" }); return true; }
+    res.writeHead(200, { "Content-Type": "image/svg+xml", "Cache-Control": "private, max-age=86400", "X-Robots-Tag": "noindex" });
+    res.end(fs.readFileSync(path.join(APP_DIR, "mapa-brasil.svg")));
+    return true;
+  }
   if (rota === "" || rota === "index.html") {
     const html = fs.readFileSync(path.join(APP_DIR, "app.html"), "utf8").replace(/\{\{VERSAO\}\}/g, SISTEMA_VERSION);
     res.writeHead(200, {
@@ -1530,6 +1843,8 @@ function handleRestrito(req, res, pathname) {
 
 module.exports = {
   handleRestrito,
+  registrarAcesso,    // o server.js chama a cada página HTML servida ao público
+  iniciarServicos,    // resolvedor de geoip + retenção — só no processo do site
   SISTEMA_VERSION,
   GESTAO_DB,
   /* consumido pelo prospector.js (worker do WhatsApp) */

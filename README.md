@@ -56,9 +56,23 @@ próprio em `data/gestao.db` (WAL — dois processos escrevem nele).
   `/etc/sudoers.d/lash` com o `ci/sudoers-lash` novo, senão o deploy não
   consegue parar/subir o worker).
 - **Chaves de API** (Anthropic para a IA, Google Places para a captação):
-  em Prospecção → Config. A chave gravada nunca volta ao navegador.
+  em Prospecção → Config. A chave gravada nunca volta ao navegador e vai ao
+  banco **cifrada (AES-256-GCM)**; a chave-mestra fica FORA do banco — na env
+  `GESTAO_CHAVE` (systemd `EnvironmentFile`) ou, sem ela, em
+  `data/gestao.chave` (0600, gerado no 1º boot). Quem levar só o `.db` leva
+  lixo. Trocar a chave-mestra depois exige recadastrar as chaves no painel.
+- **Perfis:** *administrador* faz tudo; *operador* vê Leads, Funil e
+  Prospecção (conversas, agendar, conexão) — não mexe em configuração,
+  usuários, auditoria nem acessos. Usuários, auditoria (tudo o que aconteceu
+  e por quem) e versões ficam no menu da conta (canto superior direito); o
+  menu ⠶ ao lado leva ao site e ao painel de conteúdo.
+- **Acessos ao site:** contador (visitante = IP distinto, robô não conta),
+  acessos por IP, últimos acessos e **mapa de calor por estado** com pontos
+  por cidade (mapa do IBGE, geolocalização por IP resolvida em segundo plano
+  via ipwho.is, uma vez por IP). IP é dado pessoal: **retenção de 90 dias**.
 - O `gestao.db` entra no mesmo backup diário do `site.db` e no cofre do
-  `deploy.sh`.
+  `deploy.sh`. A pasta `backups/` fica **750** e os arquivos **640** (o
+  backup.js aplica a cada cópia, inclusive nos antigos).
 
 ## Subir pela primeira vez
 

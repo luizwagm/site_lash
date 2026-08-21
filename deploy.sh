@@ -219,8 +219,11 @@ GRUPO=$($SC show "$SERVICO" -p Group --value 2>/dev/null); [ -z "$GRUPO" ] && GR
 # comando sem efeito que ainda por cima falha em alguns sistemas.
 if [ "$SOU_ROOT" = "1" ]; then chown -R "$DONO:$GRUPO" data assets/img/uploads backups 2>/dev/null; fi
 chmod 755 data assets/img/uploads 2>/dev/null
+# backups: 750 na pasta, 640 nos arquivos (é o banco inteiro, com hash e chaves)
+[ -d backups ] && chmod 750 backups 2>/dev/null && find backups -name '*.db' -exec chmod 640 {} + 2>/dev/null
 [ -f data/site.db ] && chmod 644 data/site.db
 [ -f data/gestao.db ] && chmod 644 data/gestao.db
+[ -f data/gestao.chave ] && chmod 600 data/gestao.chave
 verde "     de volta no lugar (dono: $DONO:$GRUPO)"
 
 $SC start "$SERVICO"

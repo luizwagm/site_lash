@@ -105,6 +105,29 @@
     .check{display:inline-flex;align-items:center;gap:.35rem;font-size:.82rem;color:var(--muted);white-space:nowrap}
     .qr-box{display:grid;place-items:center;background:#fff;border-radius:12px;padding:1rem;width:min(320px,100%)}
     .qr-box svg{width:100%;height:auto}
+    /* barra do topo (canto direito): atalhos + conta */
+    .barra-topo{display:flex;justify-content:flex-end;align-items:center;gap:.5rem;margin:-.6rem 0 1.2rem}
+    .menu-sup{position:relative}
+    .menu-lista{position:absolute;right:0;top:calc(100% + 6px);min-width:230px;background:var(--surface2);border:1px solid var(--line2);
+      border-radius:10px;padding:.35rem;z-index:40;box-shadow:0 14px 34px rgba(0,0,0,.55)}
+    .menu-lista a,.menu-lista button{display:block;width:100%;text-align:left;padding:.5rem .75rem;border:0;background:none;color:var(--text);
+      border-radius:7px;font-size:.9rem;text-decoration:none}
+    .menu-lista a:hover,.menu-lista button:hover{background:rgba(124,92,255,.18)}
+    .menu-sep{height:1px;background:var(--line);margin:.3rem .2rem}
+    .menu-info{padding:.4rem .75rem;font-family:var(--mono);font-size:.72rem;color:var(--dim)}
+    .btn-icone{font-size:1.15rem;line-height:1;padding:.35rem .6rem}
+    /* tabela com rolagem própria (agenda) */
+    .rolagem-300{max-height:300px;overflow-y:auto;border:1px solid var(--line);border-radius:8px}
+    .rolagem-300 thead th{position:sticky;top:0;background:var(--surface);z-index:1}
+    .pager{display:flex;justify-content:space-between;align-items:center;gap:.6rem;margin-top:.6rem;font-size:.8rem;color:var(--muted)}
+    /* mapa de calor */
+    .mapa-box{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:.6rem;position:relative}
+    .mapa-box svg{width:100%;height:auto;display:block}
+    .mapa-box path{fill:#1b1b28;stroke:#3b3b55;stroke-width:1;vector-effect:non-scaling-stroke;transition:fill .2s}
+    .mapa-box path:hover{stroke:var(--cyan)}
+    .legenda{display:flex;gap:.4rem;align-items:center;font-size:.72rem;color:var(--dim);margin-top:.4rem}
+    .legenda i{display:inline-block;width:40px;height:8px;border-radius:4px;background:linear-gradient(90deg,#1b1b28,#7c5cff,#24e3d6)}
+    .barrinha{height:6px;border-radius:3px;background:var(--grad);min-width:2px}
     @media(max-width:860px){.app{grid-template-columns:1fr}aside{position:static;height:auto;flex-direction:row;align-items:center;flex-wrap:wrap;gap:.3rem}aside img{margin:0 1rem 0 0}main{padding:1.2rem}.row,.row3{grid-template-columns:1fr}}
   </style>
 </head>
@@ -124,20 +147,37 @@
 <div class="app" id="app" hidden>
   <aside>
     <img src="/assets/img/logo-pilares.svg" alt="LA Software House">
-    <button class="navbtn on" data-p="painel">◆ Painel</button>
+    <button class="navbtn on" data-p="painel" data-admin>◆ Painel</button>
     <button class="navbtn" data-p="leads">Leads</button>
     <button class="navbtn" data-p="funil">Funil</button>
     <button class="navbtn" data-p="prospeccao">Prospecção</button>
-    <button class="navbtn" data-p="senha">Senha</button>
-    <div style="margin-top:auto">
-      <span class="pill">v{{VERSAO}}</span>
-      <a class="navbtn" href="/" target="_blank" style="text-decoration:none;display:block;margin-top:.5rem">↗ Ver o site</a>
-      <a class="navbtn" href="/admin/" target="_blank" style="text-decoration:none;display:block">↗ Conteúdo do site</a>
-      <button class="navbtn" onclick="sair()">Sair</button>
-    </div>
+    <button class="navbtn" data-p="acessos" data-admin>Acessos ao site</button>
+    <div style="margin-top:auto"><span class="pill">Gestão v{{VERSAO}}</span></div>
   </aside>
 
   <main>
+    <!-- BARRA DO TOPO: atalhos (⠶) + conta (▾) -->
+    <div class="barra-topo">
+      <div class="menu-sup">
+        <button class="btn btn-ghost btn-sm btn-icone" onclick="alternarMenu('menu-apps')" title="Atalhos" aria-haspopup="true">⠶</button>
+        <div class="menu-lista" id="menu-apps" hidden>
+          <a href="/" target="_blank" rel="noopener">↗ Ver o site</a>
+          <a href="/admin/" target="_blank" rel="noopener">↗ Painel do site (conteúdo)</a>
+        </div>
+      </div>
+      <div class="menu-sup">
+        <button class="btn btn-ghost btn-sm" onclick="alternarMenu('menu-conta')" aria-haspopup="true"><span id="conta-nome">…</span> <span class="hint" id="conta-papel"></span> ▾</button>
+        <div class="menu-lista" id="menu-conta" hidden>
+          <button onclick="irPara('senha')">Minha senha</button>
+          <button data-admin onclick="irPara('usuarios')">Usuários do sistema</button>
+          <button data-admin onclick="irPara('auditoria')">Auditoria</button>
+          <div class="menu-sep"></div>
+          <div class="menu-info" id="menu-versao">Site v— · Gestão v{{VERSAO}}</div>
+          <div class="menu-sep"></div>
+          <button onclick="sair()">Sair</button>
+        </div>
+      </div>
+    </div>
     <!-- PAINEL -->
     <section class="panel on" id="p-painel">
       <div class="topbar"><h1>Painel</h1><span class="pill" id="ola"></span></div>
@@ -220,7 +260,7 @@
     <!-- PROSPECÇÃO -->
     <section class="panel" id="p-prospeccao">
       <div class="topbar"><h1>Prospecção automática</h1>
-        <label class="check" style="font-size:.95rem"><input type="checkbox" id="pr_ligada" onchange="ligarDesligar()"> automação ligada</label>
+        <label class="check" style="font-size:.95rem" data-admin><input type="checkbox" id="pr_ligada" onchange="ligarDesligar()"> automação ligada</label>
       </div>
       <div class="card">
         <div class="diag" id="pr-diag"></div>
@@ -230,7 +270,7 @@
         <button class="aba on" data-a="conversas">Conversas</button>
         <button class="aba" data-a="agendar">Agendar</button>
         <button class="aba" data-a="conexao">Conexão</button>
-        <button class="aba" data-a="config">Config</button>
+        <button class="aba" data-a="config" data-admin>Config</button>
       </div>
 
       <div id="a-conversas">
@@ -258,13 +298,16 @@
             <button class="btn btn-grad" onclick="agendarLote()">Agendar selecionadas</button>
           </div>
         </div>
-        <div class="card" style="padding:.4rem .8rem;overflow-x:auto">
-          <table>
-            <thead><tr><th><input type="checkbox" id="ag_todas" onchange="marcarTodas()"></th><th>Empresa</th><th>Cidade</th><th>Segmento</th><th>Situação</th></tr></thead>
-            <tbody id="elegiveis-corpo"></tbody>
-          </table>
+        <div class="card" style="padding:.6rem .8rem">
+          <div class="rolagem-300">
+            <table>
+              <thead><tr><th><input type="checkbox" id="ag_todas" onchange="marcarTodas()"></th><th>Empresa</th><th>Cidade</th><th>Segmento</th><th>Situação</th></tr></thead>
+              <tbody id="elegiveis-corpo"></tbody>
+            </table>
+          </div>
         </div>
-        <div class="card"><h3 class="mb">Lotes recentes</h3><div id="lotes-lista" class="hint"></div>
+        <div class="card"><h3 class="mb">Lotes (fila)</h3><div id="lotes-lista" class="hint"></div>
+          <div class="pager" id="lotes-pager"></div>
           <p class="hint mt">A fila anda por horário crescente: um lote atrasado é drenado ANTES de um mais
           novo que acabou de vencer. Cancelar a fila só alcança o que ainda não saiu — mensagem entregue fica no histórico.</p></div>
       </div>
@@ -275,7 +318,7 @@
           <p id="cx_estado" class="mb"></p>
           <div id="cx_qr"></div>
           <p class="hint mt">O worker (<code>node prospector.js</code>) precisa estar rodando. O QR expira em ~20s e renasce sozinho — a tela atualiza a cada 5s.</p>
-          <div class="mt"><button class="btn btn-danger" onclick="desconectarWa()">Desconectar este número</button></div>
+          <div class="mt" data-admin><button class="btn btn-danger" onclick="desconectarWa()">Desconectar este número</button></div>
         </div>
       </div>
 
@@ -311,6 +354,78 @@
           <input type="password" id="cf_google_places_api_key" autocomplete="off" placeholder="AIza…">
         </div>
         <div class="right"><button class="btn btn-grad" onclick="salvarConfig()">Salvar configuração</button></div>
+      </div>
+    </section>
+
+    <!-- USUÁRIOS (admin) -->
+    <section class="panel" id="p-usuarios">
+      <div class="topbar"><h1>Usuários do sistema</h1><button class="btn btn-ghost" onclick="alternar('novo-usuario-box')">+ Novo usuário</button></div>
+      <div class="card" id="novo-usuario-box" hidden>
+        <h3 class="mb">Novo usuário</h3>
+        <p class="hint mb"><b>Administrador</b> faz tudo. <b>Operador</b> vê Leads, Funil e Prospecção (conversas, agendar, conexão) — não mexe em configuração, usuários, auditoria nem acessos.</p>
+        <div class="row3">
+          <div><label>Nome</label><input id="nu_nome"></div>
+          <div><label>E-mail (login)</label><input id="nu_email" type="email"></div>
+          <div><label>Perfil</label><select id="nu_papel"><option value="operador">Operador</option><option value="admin">Administrador</option></select></div>
+        </div>
+        <label>Senha inicial <span class="hint">mínimo 8 — a pessoa troca em “Minha senha”</span></label><input id="nu_senha" type="password" autocomplete="new-password">
+        <div class="right mt"><button class="btn btn-grad" onclick="criarUsuario()">Criar usuário</button></div>
+      </div>
+      <div class="card" style="padding:.4rem .8rem;overflow-x:auto">
+        <table>
+          <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Situação</th><th>Último acesso</th><th></th></tr></thead>
+          <tbody id="usuarios-corpo"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- AUDITORIA (admin) -->
+    <section class="panel" id="p-auditoria">
+      <div class="topbar"><h1>Auditoria</h1><span class="hint">tudo o que aconteceu, e por quem</span></div>
+      <div class="filtros">
+        <input id="au_q" placeholder="Filtrar por pessoa, ação ou texto…" oninput="clearTimeout(window._auT);window._auT=setTimeout(()=>carregarAuditoria(1),350)">
+        <span class="hint" id="au_total"></span>
+      </div>
+      <div class="card" style="padding:.4rem .8rem;overflow-x:auto">
+        <table>
+          <thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>O quê</th><th>Detalhe</th><th>IP</th></tr></thead>
+          <tbody id="auditoria-corpo"></tbody>
+        </table>
+        <div class="pager" id="auditoria-pager"></div>
+      </div>
+    </section>
+
+    <!-- ACESSOS (admin) -->
+    <section class="panel" id="p-acessos">
+      <div class="topbar"><h1>Acessos ao site</h1>
+        <div class="abas" style="margin:0">
+          <button class="aba on" data-dias="7" onclick="carregarAcessos(7,this)">7 dias</button>
+          <button class="aba" data-dias="30" onclick="carregarAcessos(30,this)">30 dias</button>
+          <button class="aba" data-dias="90" onclick="carregarAcessos(90,this)">90 dias</button>
+        </div>
+      </div>
+      <div class="card"><div class="diag" id="ac_stats"></div><p class="hint mt" id="ac_nota"></p></div>
+      <div class="row" style="gap:1rem;align-items:start">
+        <div>
+          <div class="card">
+            <h3 class="mb">De onde vêm <span class="hint">mapa de calor por estado · pontos por cidade</span></h3>
+            <div class="mapa-box" id="ac_mapa"><p class="hint">carregando o mapa…</p></div>
+            <div class="legenda"><span>menos</span><i></i><span>mais visitantes</span></div>
+            <div id="ac_paises" class="mt"></div>
+          </div>
+        </div>
+        <div>
+          <div class="card"><h3 class="mb">Por dia</h3><div id="ac_dias"></div></div>
+          <div class="card"><h3 class="mb">Páginas mais vistas</h3><div id="ac_paginas"></div></div>
+        </div>
+      </div>
+      <div class="card" style="padding:.4rem .8rem;overflow-x:auto">
+        <h3 style="padding:.6rem .2rem">Acessos por IP</h3>
+        <table><thead><tr><th>IP</th><th>Visitas</th><th>De onde</th><th>Último acesso</th></tr></thead><tbody id="ac_ips"></tbody></table>
+      </div>
+      <div class="card" style="padding:.4rem .8rem;overflow-x:auto">
+        <h3 style="padding:.6rem .2rem">Últimos acessos</h3>
+        <table><thead><tr><th>Quando</th><th>IP</th><th>Página</th><th>De onde</th><th>Veio de</th></tr></thead><tbody id="ac_ultimos"></tbody></table>
       </div>
     </section>
 
@@ -351,7 +466,7 @@
     <label>Notas</label><textarea id="ld_notas" rows="3"></textarea>
     <label class="check mt"><input type="checkbox" id="ld_optout"> opt-out (nunca mais abordar)</label>
     <div class="right mt">
-      <button class="btn btn-danger btn-sm" onclick="excluirLead()">Excluir</button>
+      <button class="btn btn-danger btn-sm" data-admin onclick="excluirLead()">Excluir</button>
       <button class="btn btn-grad" onclick="salvarLead()">Salvar</button>
     </div>
 
@@ -535,8 +650,9 @@ async function boot() {
 }
 async function entrar() {
   try {
-    const r = await api("entrar", "POST", { email: $("#lg_email").value, senha: $("#lg_senha").value });
-    EU = r; $("#login").hidden = true; mostrarApp();
+    await api("entrar", "POST", { email: $("#lg_email").value, senha: $("#lg_senha").value });
+    EU = await api("eu");   // papel, id e versões vêm daqui — o login só abre a porta
+    $("#login").hidden = true; mostrarApp();
   } catch (e) { toast(e.message, true); }
 }
 async function sair() { await api("sair", "POST"); location.reload(); }
@@ -545,6 +661,13 @@ $("#lg_senha").addEventListener("keydown", (e) => e.key === "Enter" && entrar())
 async function mostrarApp() {
   $("#app").hidden = false;
   $("#ola").textContent = EU.nome || EU.email || "";
+  $("#conta-nome").textContent = (EU.nome || EU.email || "").split(" ")[0];
+  $("#conta-papel").textContent = EU.admin ? "admin" : "operador";
+  $("#menu-versao").textContent = `Site v${EU.versaoSite || "—"} · Gestão v${EU.versao || "—"}`;
+  /* O que é de administrador some da tela do operador. A PERMISSÃO de
+     verdade é do servidor (403) — esconder aqui é só para não oferecer
+     botão que termina em recusa. */
+  document.querySelectorAll("[data-admin]").forEach((el) => { el.hidden = !EU.admin; });
   ETAPAS = (await api("funil")).etapas;
   const selE = $("#f_etapa"), selL = $("#ld_etapa");
   for (const [v, rotulo] of ETAPAS) {
@@ -566,21 +689,37 @@ async function mostrarApp() {
     cid.placeholder = uf ? "busque a cidade…" : "escolha o estado antes";
     if (uf) cidadesDe(uf).catch((e) => toast(e.message, true));   // pré-carrega
   });
-  await Promise.all([carregarPainel(), carregarLeads(), carregarFunil(), carregarDiag(), carregarConfig(), carregarConversas()]);
+  const cargas = [carregarLeads(), carregarFunil(), carregarDiag(), carregarConversas()];
+  if (EU.admin) cargas.push(carregarPainel(), carregarConfig());
+  await Promise.all(cargas);
+  irPara(EU.admin ? "painel" : "leads");
   setInterval(() => { carregarDiag().catch(() => {}); if (!$("#a-conexao").hidden) carregarCanal().catch(() => {}); }, 5000);
 }
 
 /* -------------------------------- nav ----------------------------------- */
-document.querySelectorAll(".navbtn[data-p]").forEach((b) =>
-  b.addEventListener("click", () => {
-    document.querySelectorAll(".navbtn[data-p]").forEach((x) => x.classList.remove("on"));
-    document.querySelectorAll(".panel").forEach((x) => x.classList.remove("on"));
-    b.classList.add("on");
-    $("#p-" + b.dataset.p).classList.add("on");
-    if (b.dataset.p === "funil") carregarFunil();
-    if (b.dataset.p === "painel") carregarPainel();
-  })
-);
+function irPara(p) {
+  document.querySelectorAll(".navbtn[data-p]").forEach((x) => x.classList.toggle("on", x.dataset.p === p));
+  document.querySelectorAll(".panel").forEach((x) => x.classList.remove("on"));
+  $("#p-" + p).classList.add("on");
+  fecharMenus();
+  if (p === "funil") carregarFunil();
+  if (p === "painel") carregarPainel();
+  if (p === "usuarios") carregarUsuarios();
+  if (p === "auditoria") carregarAuditoria(1);
+  if (p === "acessos") carregarAcessos(ACESSOS_DIAS);
+}
+document.querySelectorAll(".navbtn[data-p]").forEach((b) => b.addEventListener("click", () => irPara(b.dataset.p)));
+
+/* menus do topo: abrir um fecha o outro; clique fora ou Esc fecha */
+function fecharMenus() { document.querySelectorAll(".menu-lista").forEach((m) => { m.hidden = true; }); }
+function alternarMenu(id) {
+  const m = document.getElementById(id);
+  const abrir = m.hidden;
+  fecharMenus();
+  m.hidden = !abrir;
+}
+document.addEventListener("click", (e) => { if (!e.target.closest(".menu-sup")) fecharMenus(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharMenus(); });
 document.querySelectorAll(".aba").forEach((b) =>
   b.addEventListener("click", () => {
     document.querySelectorAll(".aba").forEach((x) => x.classList.remove("on"));
@@ -843,8 +982,17 @@ async function agendarLote() {
     carregarElegiveis(); carregarDiag();
   } catch (e) { toast(e.message, true); }
 }
-async function carregarLotes() {
-  const lotes = await api("prospeccao/lotes");
+let LOTES_PAG = 1;
+async function carregarLotes(pagina) {
+  if (pagina) LOTES_PAG = pagina;
+  const r = await api(`prospeccao/lotes?pagina=${LOTES_PAG}&limite=10`);
+  const lotes = r.linhas;
+  const paginas = Math.max(1, Math.ceil(r.total / r.limite));
+  if (LOTES_PAG > paginas) { LOTES_PAG = paginas; return carregarLotes(); }
+  $("#lotes-pager").innerHTML = r.total > r.limite ? `
+    <button class="btn btn-ghost btn-sm" ${LOTES_PAG <= 1 ? "disabled" : ""} onclick="carregarLotes(${LOTES_PAG - 1})">‹ anteriores</button>
+    <span>página ${LOTES_PAG} de ${paginas} · ${r.total} lotes</span>
+    <button class="btn btn-ghost btn-sm" ${LOTES_PAG >= paginas ? "disabled" : ""} onclick="carregarLotes(${LOTES_PAG + 1})">próximos ›</button>` : "";
   $("#lotes-lista").innerHTML = lotes.map((l) => {
     const t = l.tarefas;
     const partes = Object.entries(t).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(" · ");
@@ -918,6 +1066,130 @@ async function salvarConfig() {
     $("#cf_anthropic_api_key").value = ""; $("#cf_google_places_api_key").value = "";
     toast("Configuração salva!"); carregarConfig(); carregarDiag();
   } catch (e) { toast(e.message, true); }
+}
+
+/* ------------------------------ usuários --------------------------------- */
+async function carregarUsuarios() {
+  const lista = await api("usuarios");
+  $("#usuarios-corpo").innerHTML = lista.map((u) => `
+    <tr>
+      <td><b>${esc(u.nome || "—")}</b></td>
+      <td>${esc(u.email)}</td>
+      <td><select style="width:auto;padding:.3rem .5rem" onchange="editarUsuario(${u.id},{papel:this.value})" ${u.id === EU.id ? "disabled" : ""}>
+        <option value="operador" ${u.papel === "operador" ? "selected" : ""}>Operador</option>
+        <option value="admin" ${u.papel === "admin" ? "selected" : ""}>Administrador</option></select></td>
+      <td>${u.ativo ? '<span class="pill ok">ativo</span>' : '<span class="pill err">desativado</span>'}</td>
+      <td class="hint">${u.ultimo_login ? quando(u.ultimo_login) : "nunca"}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" onclick="redefinirSenha(${u.id},${JSON.stringify(u.email)})">Redefinir senha</button>
+        ${u.id === EU.id ? "" : `<button class="btn ${u.ativo ? "btn-danger" : "btn-ghost"} btn-sm" onclick="editarUsuario(${u.id},{ativo:${u.ativo ? "false" : "true"}})">${u.ativo ? "Desativar" : "Reativar"}</button>`}
+      </td>
+    </tr>`).join("");
+}
+async function criarUsuario() {
+  try {
+    await api("usuarios", "POST", { nome: $("#nu_nome").value, email: $("#nu_email").value, papel: $("#nu_papel").value, senha: $("#nu_senha").value });
+    ["nu_nome", "nu_email", "nu_senha"].forEach((i) => $("#" + i).value = "");
+    $("#novo-usuario-box").hidden = true;
+    toast("Usuário criado!"); carregarUsuarios();
+  } catch (e) { toast(e.message, true); }
+}
+async function editarUsuario(id, b) {
+  try { await api("usuarios/" + id, "PATCH", b); toast("Usuário atualizado."); carregarUsuarios(); }
+  catch (e) { toast(e.message, true); carregarUsuarios(); }
+}
+async function redefinirSenha(id, email) {
+  const senha = prompt(`Nova senha para ${email} (mínimo 8 caracteres):`);
+  if (!senha) return;
+  try { await api("usuarios/" + id, "PATCH", { senha }); toast("Senha redefinida — as outras sessões dessa pessoa caíram."); }
+  catch (e) { toast(e.message, true); }
+}
+
+/* ------------------------------ auditoria -------------------------------- */
+const ROTULO_ACAO = { LOGIN: "entrou", LOGIN_FALHOU: "falhou o login", SAIR: "saiu", SENHA: "senha", CRIAR: "criou",
+  ATUALIZAR: "atualizou", EXCLUIR: "excluiu", FUNIL: "moveu no funil", MENSAGEM: "registrou contato", BUSCA: "captou leads" };
+async function carregarAuditoria(pagina) {
+  const q = $("#au_q").value.trim();
+  const r = await api(`auditoria?pagina=${pagina}&limite=50${q ? "&q=" + encodeURIComponent(q) : ""}`);
+  const paginas = Math.max(1, Math.ceil(r.total / r.limite));
+  $("#au_total").textContent = `${r.total} registro(s)`;
+  $("#auditoria-corpo").innerHTML = r.linhas.map((a) => `
+    <tr>
+      <td class="hint" style="white-space:nowrap">${quando(a.criado_em)}</td>
+      <td>${esc(a.usuario_email || "—")}</td>
+      <td><span class="pill ${a.acao === "LOGIN_FALHOU" || a.acao === "EXCLUIR" ? "err" : ""}">${esc(ROTULO_ACAO[a.acao] || a.acao.toLowerCase())}</span></td>
+      <td class="hint">${esc(a.entidade || "")}${a.entidade_id ? " #" + esc(a.entidade_id) : ""}</td>
+      <td>${esc(a.resumo || "")}</td>
+      <td class="hint">${esc(a.ip || "")}</td>
+    </tr>`).join("") || '<tr><td colspan="6" class="hint" style="padding:1rem">Nada registrado ainda.</td></tr>';
+  $("#auditoria-pager").innerHTML = paginas > 1 ? `
+    <button class="btn btn-ghost btn-sm" ${pagina <= 1 ? "disabled" : ""} onclick="carregarAuditoria(${pagina - 1})">‹ anteriores</button>
+    <span>página ${pagina} de ${paginas}</span>
+    <button class="btn btn-ghost btn-sm" ${pagina >= paginas ? "disabled" : ""} onclick="carregarAuditoria(${pagina + 1})">próximos ›</button>` : "";
+}
+
+/* ------------------------------- acessos --------------------------------- */
+let ACESSOS_DIAS = 7, MAPA_SVG = null;
+const lugar = (x) => [x.cidade, x.uf, x.pais_cod && x.pais_cod !== "BR" ? x.pais_cod : ""].filter(Boolean).join(" · ") || (x.pais || "—");
+async function carregarAcessos(dias, botao) {
+  ACESSOS_DIAS = dias;
+  if (botao) { document.querySelectorAll("#p-acessos .aba").forEach((b) => b.classList.toggle("on", b === botao)); }
+  const d = await api("acessos?dias=" + dias);
+  $("#ac_stats").innerHTML = `
+    <div class="stat"><b>${d.hoje.visitantes}</b><span>visitantes hoje</span></div>
+    <div class="stat"><b>${d.hoje.paginas}</b><span>páginas hoje</span></div>
+    <div class="stat"><b>${d.periodo.visitantes}</b><span>visitantes · ${dias} dias</span></div>
+    <div class="stat"><b>${d.periodo.paginas}</b><span>páginas · ${dias} dias</span></div>
+    <div class="stat"><b>${d.total.visitantes}</b><span>visitantes no total</span></div>`;
+  $("#ac_nota").textContent = `Visitante = IP distinto. Robôs não contam. Retenção de 90 dias.` + (d.semGeo ? ` ${d.semGeo} IP(s) ainda sem localização (resolve em segundo plano).` : "");
+  const maxDia = Math.max(1, ...d.porDia.map((x) => x.paginas));
+  $("#ac_dias").innerHTML = d.porDia.slice(-30).map((x) => `
+    <div style="display:grid;grid-template-columns:64px 1fr 70px;gap:.5rem;align-items:center;font-size:.78rem;padding:.1rem 0">
+      <span class="hint">${x.dia.slice(5).split("-").reverse().join("/")}</span>
+      <div class="barrinha" style="width:${Math.round(100 * x.paginas / maxDia)}%"></div>
+      <span class="hint">${x.visitantes} vis · ${x.paginas} pág</span></div>`).join("") || '<p class="hint">Sem acessos no período.</p>';
+  $("#ac_paginas").innerHTML = d.paginas.map((x) => `<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;border-bottom:1px solid var(--line)"><span>${esc(x.caminho)}</span><b>${x.n}</b></div>`).join("") || '<p class="hint">—</p>';
+  $("#ac_ips").innerHTML = d.ips.map((x) => `<tr><td class="hint">${esc(x.ip)}</td><td><b>${x.n}</b></td><td>${esc(lugar(x))}</td><td class="hint">${quando(x.ultimo)}</td></tr>`).join("") || '<tr><td colspan="4" class="hint" style="padding:1rem">Nenhum acesso registrado ainda.</td></tr>';
+  $("#ac_ultimos").innerHTML = d.ultimos.map((x) => `<tr><td class="hint" style="white-space:nowrap">${quando(x.criado_em)}</td><td class="hint">${esc(x.ip)}</td><td>${esc(x.caminho)}</td><td>${esc(lugar(x))}</td><td class="hint">${esc((x.referer || "").replace(/^https?:\/\//, "").slice(0, 40))}</td></tr>`).join("");
+  $("#ac_paises").innerHTML = d.porPais.length ? `<div class="hint mb">Por país</div>` + d.porPais.map((x) => `<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.1rem 0"><span>${esc(x.pais || x.pais_cod)}</span><b>${x.visitantes}</b></div>`).join("") : "";
+  await desenharMapa(d);
+}
+/* O SVG do IBGE tem viewBox em GRAUS (x = longitude, y = −latitude): dá para
+   colocar o ponto de cada cidade direto por lat/lng, sem projeção. Cada
+   estado é um <path id="<código IBGE>"> — é isso que o calor colore. */
+async function desenharMapa(d) {
+  const caixa = $("#ac_mapa");
+  if (!MAPA_SVG) {
+    const r = await fetch("/restrito/mapa-brasil.svg");
+    if (!r.ok) { caixa.innerHTML = '<p class="hint">mapa indisponível</p>'; return; }
+    MAPA_SVG = await r.text();
+  }
+  caixa.innerHTML = MAPA_SVG;
+  const svg = caixa.querySelector("svg");
+  svg.removeAttribute("width"); svg.removeAttribute("height");
+  const porUf = Object.fromEntries(d.porUf.map((x) => [x.codigo, x]));
+  const maxUf = Math.max(1, ...d.porUf.map((x) => x.visitantes));
+  svg.querySelectorAll("path[id]").forEach((p) => {
+    const x = porUf[p.id];
+    const t = x ? x.visitantes / maxUf : 0;
+    // 0 → superfície; cresce para o violeta e termina no ciano
+    p.style.fill = t === 0 ? "#1b1b28" : t < .6 ? `rgba(124,92,255,${(.25 + t).toFixed(2)})` : `rgba(36,227,214,${(.35 + t * .6).toFixed(2)})`;
+    const tit = document.createElementNS("http://www.w3.org/2000/svg", "title");
+    tit.textContent = `${x ? x.sigla + ": " + x.visitantes + " visitante(s), " + x.paginas + " página(s)" : "sem acessos"}`;
+    p.appendChild(tit);
+  });
+  const maxPt = Math.max(1, ...d.pontos.map((x) => x.visitantes));
+  for (const pt of d.pontos) {
+    if (pt.pais_cod !== "BR") continue;   // fora do Brasil fica na lista "por país"
+    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    c.setAttribute("cx", pt.lng); c.setAttribute("cy", -pt.lat);
+    c.setAttribute("r", (0.28 + 0.9 * Math.sqrt(pt.visitantes / maxPt)).toFixed(2));
+    c.setAttribute("fill", "rgba(36,227,214,.55)"); c.setAttribute("stroke", "#24e3d6"); c.setAttribute("stroke-width", "0.06");
+    const tit = document.createElementNS("http://www.w3.org/2000/svg", "title");
+    tit.textContent = `${pt.cidade || "?"}${pt.uf ? "/" + pt.uf : ""}: ${pt.visitantes} visitante(s)`;
+    c.appendChild(tit);
+    svg.appendChild(c);
+  }
 }
 
 /* ------------------------------- senha ----------------------------------- */

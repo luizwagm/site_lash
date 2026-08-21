@@ -25,6 +25,20 @@ const { abrirBanco } = require("./db");
 const CARIMBO = () => new Date().toISOString().slice(0, 19).replace("T", "_").replace(/:/g, "");
 
 /* Uma cópia verificada de um banco. Devolve {ok, arquivo, bytes, erro}. */
+/* Permissões da pasta de backups: 750 na pasta, 640 nos arquivos. Um backup
+   é o banco inteiro, com hash de senha e chaves — "legível por todo mundo" no
+   servidor seria um segundo caminho de vazamento. Corrige também o que já
+   existia, porque backup antigo não some sozinho. No Windows o chmod não faz
+   nada, e tudo bem. */
+function ajustarPermissoes(destinoDir) {
+  try { fs.chmodSync(destinoDir, 0o750); } catch {}
+  try {
+    for (const f of fs.readdirSync(destinoDir)) {
+      if (/\.db(-\d+)?$/i.test(f)) { try { fs.chmodSync(path.join(destinoDir, f), 0o640); } catch {} }
+    }
+  } catch {}
+}
+
 function copiarBanco(origem, destinoDir) {
   const nome = path.basename(origem, ".db");
   let arquivo = "";
@@ -32,6 +46,7 @@ function copiarBanco(origem, destinoDir) {
   try {
     if (!fs.existsSync(origem)) return { ok: false, erro: "banco ainda não existe" };
     fs.mkdirSync(destinoDir, { recursive: true });
+    ajustarPermissoes(destinoDir);
     /* O carimbo tem precisão de segundo. Duas cópias no mesmo segundo (backup
        manual logo após o automático) cairiam no mesmo nome, e o VACUUM INTO se
        recusa a sobrescrever — então desempata com um sufixo. */
@@ -55,6 +70,7 @@ function copiarBanco(origem, destinoDir) {
       fs.unlinkSync(arquivo);
       return { ok: false, erro: "cópia corrompida (" + veredito + ")" };
     }
+    try { fs.chmodSync(arquivo, 0o640); } catch {}   // dono lê/escreve, grupo lê, resto nada
     return { ok: true, arquivo, bytes: fs.statSync(arquivo).size };
   } catch (e) {
     try { if (db) db.close(); } catch {}
@@ -125,6 +141,7 @@ function agendarBackups(opcoes) {
     intervaloHoras: opcoes.intervaloHoras || 24,
   };
   fs.mkdirSync(cfg.destino, { recursive: true });
+  ajustarPermissoes(cfg.destino);
 
   const vencido = () => cfg.bancos.some((origem) => {
     const t = ultimaCopia(cfg.destino, path.basename(origem, ".db"));

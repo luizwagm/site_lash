@@ -21,7 +21,7 @@ const { abrirBanco, DRIVER_NOME, DRIVER_AVISO } = require("./db");
 const { agendarBackups, rodarBackup, statusBackup } = require("./backup");
 /* Gestão da agência (/restrito): leads, funil, prospecção por WhatsApp e IA.
    Módulo separado com banco próprio (data/gestao.db) — ver restrito.js. */
-const { handleRestrito, SISTEMA_VERSION, GESTAO_DB } = require("./restrito");
+const { handleRestrito, registrarAcesso, iniciarServicos, SISTEMA_VERSION, GESTAO_DB } = require("./restrito");
 
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT) || 5180;   // PORT por env permite subir cópia de teste
@@ -29,7 +29,7 @@ const PORT = Number(process.env.PORT) || 5180;   // PORT por env permite subir c
    REGRA: feature nova sobe a 2ª casa (1.3.0, 1.4.0… pode passar de 10);
    correção de bug sobe a 3ª (1.4.1, 1.4.2…, também sem teto).
    A 1ª casa não muda. */
-const APP_VERSION = "1.9.0";
+const APP_VERSION = "1.10.0";
 const UPLOAD_DIR = path.join(ROOT, "assets", "img", "uploads");
 fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -708,8 +708,12 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(404, { "Content-Type": MIME[".html"] });
       return res.end(fs.readFileSync(path.join(ROOT, "404.html")));
     }
-    res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream" });
+    const tipo = MIME[path.extname(file)] || "application/octet-stream";
+    res.writeHead(200, { "Content-Type": tipo });
     res.end(fs.readFileSync(file));
+    /* Contador de acessos do site: só PÁGINA (HTML) conta, não CSS/imagem —
+       senão uma visita vira trinta. Vai para o gestao.db, que o /restrito lê. */
+    if (req.method === "GET" && tipo === MIME[".html"]) registrarAcesso(req, p);
   } catch (e) {
     /* Erro do CLIENTE (corpo malformado, payload gigante) é 400 e pode dizer o
        motivo. Qualquer outra falha é 500 GENÉRICO: a mensagem de exceção
@@ -755,6 +759,7 @@ server.listen(PORT, process.env.HOST || "127.0.0.1", () => {
   console.log(`  · Gestão:  http://localhost:${PORT}/restrito/  (v${SISTEMA_VERSION} — worker: node prospector.js)`);
   console.log(`  · Banco:  ${DRIVER_NOME}${DRIVER_AVISO ? " ⚠ " + DRIVER_AVISO : ""}`);
   agendarBackups(BACKUP_CFG);
+  iniciarServicos();   // geolocalização dos acessos + retenção (só neste processo)
 
   /* Testa a escrita no boot. Sem isto, um banco somente-leitura só aparece
      quando o cliente tenta salvar algo pelo painel e nada acontece. */
