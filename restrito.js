@@ -26,7 +26,7 @@ const crypto = require("node:crypto");
 const { abrirBanco } = require("./db");
 
 const ROOT = __dirname;
-const SISTEMA_VERSION = "1.1.0";
+const SISTEMA_VERSION = "1.1.1";
 const APP_DIR = path.join(ROOT, "restrito");
 
 /* Caminho do banco por env para a bateria de testes rodar num arquivo
@@ -460,8 +460,22 @@ async function cacarLeads({ cidade, uf, nicho }) {
   let inseridos = 0, total = 0, pageToken;
 
   for (let pagina = 0; pagina < 3; pagina++) {
-    const corpo = pageToken ? { pageToken } : bias;
-    const r = await buscarPlaces(`${nicho} em ${cidade} ${uf}`, corpo);
+    /* A página seguinte tem de repetir OS MESMOS parâmetros da primeira
+       (inclusive o locationBias) — só acrescenta o pageToken. Mandar só o
+       token devolve INVALID_ARGUMENT: "paging requests must match the
+       initial SearchText request". */
+    const corpo = pageToken ? { ...bias, pageToken } : bias;
+    let r;
+    try {
+      r = await buscarPlaces(`${nicho} em ${cidade} ${uf}`, corpo);
+    } catch (e) {
+      /* A 1ª página falhando é erro de verdade (chave, cota, consulta). Uma
+         página SEGUINTE falhando não pode jogar fora o que já entrou — fica
+         o parcial e o log conta o resto. */
+      if (pagina === 0) throw e;
+      console.error(`  ✖ captação: página ${pagina + 1} falhou (${e.message}) — mantendo as anteriores`);
+      break;
+    }
     for (const lugar of r.places || []) {
       total++;
       if (!lugar.id) { pulados.semId++; continue; }
