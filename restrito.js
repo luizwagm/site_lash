@@ -26,7 +26,7 @@ const crypto = require("node:crypto");
 const { abrirBanco } = require("./db");
 
 const ROOT = __dirname;
-const SISTEMA_VERSION = "1.3.0";
+const SISTEMA_VERSION = "1.4.0";
 const APP_VERSION_SITE = require("./package.json").version;   // a versão do SITE, mostrada no menu
 const APP_DIR = path.join(ROOT, "restrito");
 
@@ -210,6 +210,33 @@ if (/vendedor/.test(defUsuarios)) {
   `);
 }
 db.prepare("INSERT OR IGNORE INTO canal(id) VALUES('wa')").run();
+
+/* ===========================================================================
+   TEMPO REAL — SSE (/restrito/api/eventos).
+   O evento leva SÓ O ASSUNTO ("leads", "conversas", "fila", "canal"…), nunca
+   o dado: quem recebe re-busca o que está olhando, com a permissão dele. É o
+   que impede, por exemplo, um dado de admin chegar ao navegador do operador
+   por outro caminho. Dois processos escrevem no banco (site e worker), e o
+   SQLite não tem LISTEN/NOTIFY — então o anúncio é um contador por assunto
+   na tabela `eventos`: quem anuncia incrementa; o processo do site lê a
+   tabela a cada 2s e repassa aos navegadores conectados. O que acontece no
+   próprio processo do site sai na hora, sem esperar o laço.
+   ========================================================================== */
+db.exec("CREATE TABLE IF NOT EXISTS eventos (assunto TEXT PRIMARY KEY, seq INTEGER NOT NULL DEFAULT 0, em TEXT)");
+const clientesSse = new Set();
+const seqVista = {};   // assunto -> último seq já repassado (só no processo do site)
+function emitirSse(assunto) {
+  const pacote = `data: ${JSON.stringify({ assunto })}\n\n`;
+  for (const res of clientesSse) { try { res.write(pacote); } catch { clientesSse.delete(res); } }
+}
+function anunciar(assunto) {
+  try {
+    const r = db.prepare(`INSERT INTO eventos(assunto,seq,em) VALUES(?,1,?)
+      ON CONFLICT(assunto) DO UPDATE SET seq=seq+1, em=excluded.em RETURNING seq`).get(assunto, new Date().toISOString());
+    if (servicosLigados) { seqVista[assunto] = r.seq; emitirSse(assunto); }   // site: já sai; worker: o laço repassa
+  } catch (e) { console.error("  ✖ anunciar:", e.message); }
+}
+let servicosLigados = false;
 
 /* Migração leve — o CREATE IF NOT EXISTS não altera tabela existente. */
 for (const alt of [
@@ -437,6 +464,7 @@ function auditar(sessao, acao, entidade, entidadeId, resumo, req) {
     db.prepare("INSERT INTO auditoria(usuario_id,usuario_email,acao,entidade,entidade_id,resumo,ip,criado_em) VALUES(?,?,?,?,?,?,?,?)")
       .run(sessao?.usuarioId ?? null, sessao?.email ?? null, acao, entidade ?? null,
         entidadeId != null ? String(entidadeId) : null, resumo ?? null, req ? ipDe(req) : null, agora());
+    anunciar("auditoria");
   } catch (e) { console.error("  ✖ auditoria:", e.message); }
 }
 
@@ -509,8 +537,9 @@ function espelharFunil(leadId, statusConversa) {
   const alvo = FUNIL_POR_STATUS[statusConversa];
   if (!alvo) return;
   const lead = db.prepare("SELECT etapa FROM leads WHERE id=?").get(leadId);
-  if (lead && ETAPAS_AUTOMATICAS.has(lead.etapa)) {
+  if (lead && ETAPAS_AUTOMATICAS.has(lead.etapa) && lead.etapa !== alvo) {
     db.prepare("UPDATE leads SET etapa=?, atualizado_em=? WHERE id=?").run(alvo, agora(), leadId);
+    anunciar("leads");
   }
 }
 
@@ -882,6 +911,7 @@ function conversaDoLead(leadId) {
 function gravarMensagem(conversaId, direcao, corpo, viaIa, idExterno, cfg) {
   db.prepare("INSERT INTO mensagens(conversa_id,direcao,corpo,via_ia,id_externo,dia_local,criado_em) VALUES(?,?,?,?,?,?,?)")
     .run(conversaId, direcao, corpo, viaIa ? 1 : 0, idExterno || null, diaLocal(cfg.fuso), agora());
+  anunciar("conversas");
 }
 function turnosDe(conversaId) {
   return db.prepare("SELECT direcao,corpo FROM mensagens WHERE conversa_id=? ORDER BY criado_em DESC, id DESC LIMIT 40")
@@ -890,6 +920,7 @@ function turnosDe(conversaId) {
 const atualizarConversa = (id, campos) => {
   const sets = Object.keys(campos).map((c) => `${c}=?`).join(",");
   db.prepare(`UPDATE conversas SET ${sets}, atualizado_em=? WHERE id=?`).run(...Object.values(campos), agora(), id);
+  anunciar("conversas");
 };
 
 function aplicarIntencao(conversa, decisao) {
@@ -919,12 +950,14 @@ async function executarTarefa(tarefa, canal, cfg) {
 
   const cancelar = (motivo) => {
     db.prepare("UPDATE tarefas SET status='CANCELADO', ultimo_erro=? WHERE id=?").run(motivo, tarefa.id);
+    anunciar("fila");
     return "cancelada";
   };
   const devolver = (erro) => {
     const t = db.prepare("SELECT tentativas FROM tarefas WHERE id=?").get(tarefa.id);
     if (t.tentativas >= 3) db.prepare("UPDATE tarefas SET status='FALHOU', ultimo_erro=? WHERE id=?").run(erro, tarefa.id);
     else db.prepare("UPDATE tarefas SET reivindicada_em=NULL, ultimo_erro=? WHERE id=?").run(erro, tarefa.id);
+    anunciar("fila");
     return "falhou";
   };
 
@@ -970,6 +1003,7 @@ async function executarTarefa(tarefa, canal, cfg) {
     espelharFunil(lead.id, "ENVIADO");
   } catch (e) { console.error("  ✖ pós-envio:", e.message); }
   db.prepare("UPDATE tarefas SET status='ENVIADO', enviada_em=? WHERE id=?").run(agora(), tarefa.id);
+  anunciar("fila");
   return "enviada";
 }
 
@@ -1172,16 +1206,17 @@ function tratarEcoHumano(telefone, texto, idExterno) {
    nosso não pode reescrever o registro do que a empresa mandou. */
 function registrarVeredito(idExterno, veredito) {
   if (!idExterno || !veredito) return;
-  db.prepare("UPDATE mensagens SET veredito=?, veredito_em=? WHERE id_externo=? AND direcao='SAIDA'")
+  const r = db.prepare("UPDATE mensagens SET veredito=?, veredito_em=? WHERE id_externo=? AND direcao='SAIDA'")
     .run(veredito, agora(), idExterno);
+  if (r.changes) anunciar("conversas");
 }
 
 /* --------------------- Canal (estado publicado no banco) ----------------- */
 const canalStatus = {
-  batimento: () => db.prepare("UPDATE canal SET batimento=? WHERE id='wa'").run(agora()),
-  publicarQr: (qr) => db.prepare("UPDATE canal SET estado='AGUARDANDO_QR', qr=?, qr_em=?, ultimo_erro=NULL WHERE id='wa'").run(qr, agora()),
-  publicarConectado: (fone) => db.prepare("UPDATE canal SET estado='CONECTADO', qr=NULL, telefone=?, conectado_em=?, ultimo_erro=NULL WHERE id='wa'").run(fone || null, agora()),
-  publicarDesconectado: (erro) => db.prepare("UPDATE canal SET estado='DESCONECTADO', qr=NULL, ultimo_erro=? WHERE id='wa'").run(erro || null),
+  batimento: () => { db.prepare("UPDATE canal SET batimento=? WHERE id='wa'").run(agora()); anunciar("canal"); },
+  publicarQr: (qr) => { db.prepare("UPDATE canal SET estado='AGUARDANDO_QR', qr=?, qr_em=?, ultimo_erro=NULL WHERE id='wa'").run(qr, agora()); anunciar("canal"); },
+  publicarConectado: (fone) => { db.prepare("UPDATE canal SET estado='CONECTADO', qr=NULL, telefone=?, conectado_em=?, ultimo_erro=NULL WHERE id='wa'").run(fone || null, agora()); anunciar("canal"); },
+  publicarDesconectado: (erro) => { db.prepare("UPDATE canal SET estado='DESCONECTADO', qr=NULL, ultimo_erro=? WHERE id='wa'").run(erro || null); anunciar("canal"); },
   consumirPedidoSair: () => {
     const r = db.prepare("SELECT sair_solicitado s FROM canal WHERE id='wa'").get();
     if (r?.s) db.prepare("UPDATE canal SET sair_solicitado=0 WHERE id='wa'").run();
@@ -1272,6 +1307,7 @@ function registrarAcesso(req, caminho) {
     const cfg = lerConfigIA();
     db.prepare("INSERT INTO acessos(ip,caminho,ua,referer,dia,criado_em) VALUES(?,?,?,?,?,?)")
       .run(ip.slice(0, 64), String(caminho).slice(0, 200), ua, String(req.headers.referer || "").slice(0, 300), diaLocal(cfg.fuso), agora());
+    anunciar("acessos");
   } catch (e) { console.error("  ✖ acesso:", e.message); }
 }
 
@@ -1315,12 +1351,22 @@ async function resolverGeoip(ip) {
   } finally { clearTimeout(t); }
 }
 
-let servicosLigados = false;
 /* Só o server.js liga isto — o worker também carrega este módulo e não pode
    virar um segundo resolvedor disputando a cota do serviço de geolocalização. */
 function iniciarServicos() {
   if (servicosLigados) return;
   servicosLigados = true;
+  // ponto de partida do repasse: o que já está na tabela não é novidade
+  for (const r of db.prepare("SELECT assunto, seq FROM eventos").all()) seqVista[r.assunto] = r.seq;
+  setInterval(() => {
+    try {
+      for (const r of db.prepare("SELECT assunto, seq FROM eventos").all()) {
+        if ((seqVista[r.assunto] || 0) < r.seq) { seqVista[r.assunto] = r.seq; emitirSse(r.assunto); }
+      }
+    } catch (e) { console.error("  ✖ repasse de eventos:", e.message); }
+  }, 2000).unref();
+  // batimento do SSE: proxies fecham conexão calada; um comentário a cada 25s a mantém viva
+  setInterval(() => { for (const res of clientesSse) { try { res.write(":ping\n\n"); } catch { clientesSse.delete(res); } } }, 25_000).unref();
   let rodando = false;
   setInterval(async () => {
     if (rodando) return;
@@ -1444,6 +1490,7 @@ async function rotaApi(req, res, rota) {
     const r = db.prepare("INSERT INTO usuarios(email,nome,senha_hash,papel,ativo,criado_em) VALUES(?,?,?,?,1,?)")
       .run(email, String(b.nome || "").trim(), hashSenha(b.senha), b.papel, agora());
     auditar(sessao, "CRIAR", "usuario", r.lastInsertRowid, `Criou usuário ${email} (${b.papel})`, req);
+    anunciar("usuarios");
     return json(res, 200, { ok: true, id: Number(r.lastInsertRowid) });
   }
   const mu = rota.match(/^usuarios\/(\d+)$/);
@@ -1477,6 +1524,7 @@ async function rotaApi(req, res, rota) {
       // sessão viva do usuário editado passa a refletir o papel/nome novos
       for (const s of sessoes.values()) if (s.usuarioId === u.id) { if ("papel" in b) s.papel = b.papel; if ("nome" in b) s.nome = b.nome; }
       auditar(sessao, "ATUALIZAR", "usuario", u.id, `Usuário ${u.email}: ${mudou.join(", ")}`, req);
+      anunciar("usuarios");
     }
     return json(res, 200, { ok: true });
   }
@@ -1537,6 +1585,7 @@ async function rotaApi(req, res, rota) {
         siteProprio(b.site) ? 1 : 0, (b.segmento || "").toLowerCase(), "manual", b.responsavel || "",
         whatsapp ? "NOVO_LEAD" : "SEM_WHATSAPP", b.notas || "", agora(), agora());
     auditar(sessao, "CRIAR", "lead", r.lastInsertRowid, `Lead manual: ${b.nome}`, req);
+    anunciar("leads");
     return json(res, 200, { ok: true, id: Number(r.lastInsertRowid) });
   }
 
@@ -1575,6 +1624,7 @@ async function rotaApi(req, res, rota) {
         db.prepare(`UPDATE leads SET ${sets.join(",")}, atualizado_em=? WHERE id=?`).run(...vals, agora(), lead.id);
         if ("etapa" in b && b.etapa !== lead.etapa)
           auditar(sessao, "FUNIL", "lead", lead.id, `Moveu "${lead.nome}" no funil: ${lead.etapa} → ${b.etapa}`, req);
+        anunciar("leads");
       }
       return json(res, 200, { ok: true });
     }
@@ -1587,6 +1637,7 @@ async function rotaApi(req, res, rota) {
       db.prepare("DELETE FROM registros_contato WHERE lead_id=?").run(lead.id);
       db.prepare("DELETE FROM leads WHERE id=?").run(lead.id);
       auditar(sessao, "EXCLUIR", "lead", lead.id, `Excluiu "${lead.nome}"`, req);
+      anunciar("leads"); anunciar("fila"); anunciar("conversas");
       return json(res, 200, { ok: true });
     }
     if (ml[2] === "mensagem-ia" && m === "POST") {
@@ -1605,6 +1656,7 @@ async function rotaApi(req, res, rota) {
         db.prepare("UPDATE leads SET etapa='MENSAGEM_ENVIADA', atualizado_em=? WHERE id=?").run(agora(), lead.id);
       }
       auditar(sessao, "MENSAGEM", "lead", lead.id, `Contato manual (${canalContato})`, req);
+      anunciar("leads");
       return json(res, 200, { ok: true });
     }
   }
@@ -1622,6 +1674,7 @@ async function rotaApi(req, res, rota) {
     if (!UFS.includes(String(uf).toUpperCase())) return json(res, 400, { error: "UF inválida." });
     const r = await cacarLeads({ cidade: String(cidade).trim(), uf: String(uf).trim(), nicho: String(nicho).trim() });
     auditar(sessao, "BUSCA", "lead", null, `Captação: "${nicho}" em ${cidade}/${uf} — ${r.inseridos} novos de ${r.total}`, req);
+    anunciar("leads"); anunciar("fila");
     return json(res, 200, { ok: true, ...r });
   }
 
@@ -1635,11 +1688,18 @@ async function rotaApi(req, res, rota) {
   if (rota === "prospeccao/elegiveis" && m === "GET") {
     const linhas = db.prepare(`SELECT * FROM leads WHERE opt_out=0 AND whatsapp IS NOT NULL
       ORDER BY avaliacoes DESC NULLS LAST, nome ASC LIMIT 300`).all();
-    const itens = linhas.map((l) => ({
-      id: l.id, nome: l.nome, cidade: l.cidade, uf: l.uf, segmento: l.segmento,
-      whatsapp: l.whatsapp, site_proprio: l.site_proprio, etapa: l.etapa,
-      bloqueio: motivoBloqueio(l),
-    }));
+    const itens = linhas.map((l) => {
+      const bloqueio = motivoBloqueio(l);
+      return {
+        id: l.id, nome: l.nome, cidade: l.cidade, uf: l.uf, segmento: l.segmento,
+        whatsapp: l.whatsapp, site_proprio: l.site_proprio, etapa: l.etapa, bloqueio,
+        // detalhe para as abas da agenda: quando está agendado / como vai a conversa
+        agendado_para: bloqueio === "já agendado"
+          ? db.prepare("SELECT MIN(agendada_para) m FROM tarefas WHERE lead_id=? AND status='PENDENTE'").get(l.id).m : null,
+        conversa_status: bloqueio === "já em conversa"
+          ? db.prepare("SELECT status FROM conversas WHERE lead_id=?").get(l.id)?.status : null,
+      };
+    });
     return json(res, 200, { itens, total: itens.length, disponiveis: itens.filter((i) => !i.bloqueio).length });
   }
   if (rota === "prospeccao/lotes" && m === "GET") {
@@ -1665,6 +1725,7 @@ async function rotaApi(req, res, rota) {
     if (isNaN(data.getTime())) return json(res, 400, { error: "Data/hora inválida." });
     const r = agendarLote(leadIds.map(Number), data.toISOString(), nota, sessao.usuarioId);
     auditar(sessao, "CRIAR", "lote", r.loteId, `Lote de prospecção: ${r.criados} tarefas`, req);
+    anunciar("fila");
     return json(res, 200, { ok: true, ...r });
   }
   const mlote = rota.match(/^prospeccao\/lotes\/(\d+)$/);
@@ -1679,6 +1740,7 @@ async function rotaApi(req, res, rota) {
         reivindicada_em=NULL WHERE lote_id=? AND status='PENDENTE'`).run(mlote[1]);
     auditar(sessao, "ATUALIZAR", "lote", lote.id,
       `Cancelou ${r.changes} contato(s) pendente(s) do lote de ${lote.agendado_para}`, req);
+    anunciar("fila");
     return json(res, 200, { ok: true, cancelados: r.changes });
   }
 
@@ -1763,6 +1825,7 @@ async function rotaApi(req, res, rota) {
     const depois = lerConfigIA();
     if (antes.ligada !== depois.ligada)
       auditar(sessao, "ATUALIZAR", "config", "ia_ligada", `Automação ${depois.ligada ? "LIGADA" : "desligada"}`, req);
+    anunciar("diagnostico");
     return json(res, 200, { ok: true });
   }
   if (rota === "prospeccao/canal" && m === "GET") {
@@ -1783,6 +1846,7 @@ async function rotaApi(req, res, rota) {
     if (acao !== "desconectar") return json(res, 400, { error: "Ação inválida" });
     db.prepare("UPDATE canal SET sair_solicitado=1 WHERE id='wa'").run();
     auditar(sessao, "ATUALIZAR", "canal", "wa", "Pediu desconexão do WhatsApp", req);
+    anunciar("canal");
     return json(res, 200, { ok: true });
   }
 
@@ -1803,6 +1867,20 @@ function handleRestrito(req, res, pathname) {
   if (pathname === "/restrito") { res.writeHead(302, { Location: "/restrito/" }); res.end(); return true; }
   const rota = pathname.slice("/restrito/".length);
 
+  if (rota === "api/eventos") {
+    if (!sessaoDe(req)) { json(res, 401, { error: "Não autenticado" }); return true; }
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "X-Accel-Buffering": "no",   // o nginx não pode segurar o fluxo em buffer
+      "X-Robots-Tag": "noindex, nofollow",
+    });
+    res.write(":ok\n\n");
+    clientesSse.add(res);
+    req.on("close", () => clientesSse.delete(res));
+    return true;
+  }
   if (rota.startsWith("api/")) {
     rotaApi(req, res, rota.slice(4)).catch((e) => {
       const doCliente = /JSON inválido|payload muito grande/i.test(e.message || "");

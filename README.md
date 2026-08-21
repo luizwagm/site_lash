@@ -70,6 +70,15 @@ próprio em `data/gestao.db` (WAL — dois processos escrevem nele).
   acessos por IP, últimos acessos e **mapa de calor por estado** com pontos
   por cidade (mapa do IBGE, geolocalização por IP resolvida em segundo plano
   via ipwho.is, uma vez por IP). IP é dado pessoal: **retenção de 90 dias**.
+- **Tempo real por SSE** (`/restrito/api/eventos`): a tela não precisa ser
+  recarregada. O evento leva **só o assunto** (leads, conversas, fila,
+  canal, acessos…), nunca o dado — quem recebe re-busca o que está olhando,
+  com a permissão dele. O worker é outro processo: ele anuncia num contador
+  na tabela `eventos` e o servidor do site repassa em até 2s; o que acontece
+  no próprio servidor sai na hora. O nginx recebe `X-Accel-Buffering: no`.
+- **Agenda em abas:** Disponíveis / Já agendados (com a data) / Já em
+  conversa (com o status) / Sem celular, busca local, e a seleção sobrevive
+  às atualizações em tempo real.
 - O `gestao.db` entra no mesmo backup diário do `site.db` e no cofre do
   `deploy.sh`. A pasta `backups/` fica **750** e os arquivos **640** (o
   backup.js aplica a cada cópia, inclusive nos antigos).

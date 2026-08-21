@@ -299,9 +299,16 @@
           </div>
         </div>
         <div class="card" style="padding:.6rem .8rem">
+          <div class="abas" style="margin:.2rem 0 .6rem;align-items:center">
+            <button class="aba on" data-f="disponivel" onclick="abaElegiveis('disponivel',this)">Disponíveis <span class="pill" id="ag_n_disponivel">0</span></button>
+            <button class="aba" data-f="agendado" onclick="abaElegiveis('agendado',this)">Já agendados <span class="pill" id="ag_n_agendado">0</span></button>
+            <button class="aba" data-f="conversa" onclick="abaElegiveis('conversa',this)">Já em conversa <span class="pill" id="ag_n_conversa">0</span></button>
+            <button class="aba" data-f="semcelular" onclick="abaElegiveis('semcelular',this)">Sem celular <span class="pill" id="ag_n_semcelular">0</span></button>
+            <input id="ag_busca" placeholder="buscar empresa, cidade, segmento…" oninput="renderElegiveis()" style="margin-left:auto;width:auto;min-width:220px;padding:.4rem .7rem;font-size:.85rem">
+          </div>
           <div class="rolagem-300">
             <table>
-              <thead><tr><th><input type="checkbox" id="ag_todas" onchange="marcarTodas()"></th><th>Empresa</th><th>Cidade</th><th>Segmento</th><th>Situação</th></tr></thead>
+              <thead><tr><th id="ag_th_sel"><input type="checkbox" id="ag_todas" onchange="marcarTodas()"></th><th>Empresa</th><th>Cidade</th><th>Segmento</th><th>Etapa</th><th>Situação</th></tr></thead>
               <tbody id="elegiveis-corpo"></tbody>
             </table>
           </div>
@@ -693,7 +700,62 @@ async function mostrarApp() {
   if (EU.admin) cargas.push(carregarPainel(), carregarConfig());
   await Promise.all(cargas);
   irPara(EU.admin ? "painel" : "leads");
-  setInterval(() => { carregarDiag().catch(() => {}); if (!$("#a-conexao").hidden) carregarCanal().catch(() => {}); }, 5000);
+  ligarTempoReal();
+  // rede de segurança: se o SSE cair sem avisar, o diagnóstico ainda se atualiza de minuto em minuto
+  setInterval(() => { carregarDiag().catch(() => {}); }, 60_000);
+}
+
+/* ----------------------------- tempo real -------------------------------- */
+/* O evento traz SÓ o assunto; a tela re-busca o que está olhando. Debounce
+   curto porque o motor dispara vários anúncios numa mesma ação. */
+const reacoes = {};
+function ligarTempoReal() {
+  const es = new EventSource("/restrito/api/eventos");
+  es.onmessage = (e) => { try { reagir(JSON.parse(e.data).assunto); } catch {} };
+  // EventSource reconecta sozinho; nada a fazer no onerror
+}
+function reagir(assunto) {
+  clearTimeout(reacoes[assunto]);
+  reacoes[assunto] = setTimeout(() => {
+    const ativo = document.querySelector(".panel.on")?.id;
+    const seguro = (fn) => fn().catch(() => {});
+    switch (assunto) {
+      case "leads":
+        seguro(carregarLeads);
+        if (ativo === "p-funil") seguro(carregarFunil);
+        if (ativo === "p-painel") seguro(carregarPainel);
+        if (!$("#a-agendar").hidden) seguro(carregarElegiveis);
+        break;
+      case "conversas":
+        seguro(carregarConversas); seguro(carregarDiag);
+        if (!$("#modal-conversa").hidden && conversaAberta) seguro(() => abrirConversa(conversaAberta.id));
+        if (!$("#modal-lead").hidden && leadAberto) seguro(() => atualizarTimelineDoLead(leadAberto.id));
+        break;
+      case "fila":
+        seguro(carregarDiag);
+        if (!$("#a-agendar").hidden) seguro(carregarElegiveis);
+        break;
+      case "canal":
+        seguro(carregarDiag);
+        if (!$("#a-conexao").hidden) seguro(carregarCanal);
+        break;
+      case "diagnostico": seguro(carregarDiag); break;
+      case "acessos": if (ativo === "p-acessos") seguro(() => carregarAcessos(ACESSOS_DIAS)); break;
+      case "auditoria": if (ativo === "p-auditoria") seguro(() => carregarAuditoria(AUD_PAG)); break;
+      case "usuarios": if (ativo === "p-usuarios") seguro(carregarUsuarios); break;
+    }
+  }, assunto === "acessos" ? 2000 : 400);
+}
+/* Só a linha do tempo do lead aberto — sem mexer nos campos que a pessoa
+   pode estar editando na mesma modal. */
+async function atualizarTimelineDoLead(id) {
+  const r = await api("leads/" + id);
+  if (!leadAberto || leadAberto.id !== id) return;
+  const eventos = [
+    ...r.registros.map((x) => ({ t: x.criado_em, html: `<div class="balao saida">📌 <b>${esc(x.canal)}</b> — ${esc(x.mensagem)}<span class="quando">${quando(x.criado_em)}</span></div>` })),
+    ...r.mensagens.map((x) => ({ t: x.criado_em, html: `<div class="balao ${x.direcao === "ENTRADA" ? "entrada" : "saida"}">${esc(x.corpo)}<span class="quando">${x.direcao === "SAIDA" ? (x.via_ia ? "IA · " : "nós · ") : "empresa · "}${quando(x.criado_em)}</span></div>` })),
+  ].sort((a, b) => a.t < b.t ? -1 : 1);
+  $("#ld_timeline").innerHTML = eventos.map((e) => e.html).join("") || '<p class="hint">Nenhum contato registrado ainda.</p>';
 }
 
 /* -------------------------------- nav ----------------------------------- */
@@ -951,20 +1013,51 @@ async function acaoConversa(acao) {
 }
 
 /* ------------------------------ agendar ---------------------------------- */
-let ELEGIVEIS = [];
+let ELEGIVEIS = [], ABA_ELEG = "disponivel";
+const grupoDe = (l) => !l.bloqueio ? "disponivel" : l.bloqueio === "já agendado" ? "agendado" : l.bloqueio === "já em conversa" ? "conversa" : "semcelular";
 async function carregarElegiveis() {
   const r = await api("prospeccao/elegiveis");
   ELEGIVEIS = r.itens;
   $("#ag_resumo").textContent = `${r.disponiveis} disponíveis de ${r.total}`;
-  $("#elegiveis-corpo").innerHTML = ELEGIVEIS.map((l) => `
+  renderElegiveis();
+  await carregarLotes();
+}
+function abaElegiveis(f, botao) {
+  ABA_ELEG = f;
+  document.querySelectorAll("#a-agendar .aba[data-f]").forEach((b) => b.classList.toggle("on", b === botao));
+  renderElegiveis();
+}
+/* Re-render preserva o que estava marcado: a lista atualiza sozinha (tempo
+   real) e perder a seleção no meio de um agendamento seria pior que não
+   atualizar. */
+function renderElegiveis() {
+  const marcados = new Set([...document.querySelectorAll(".ag_sel:checked")].map((c) => Number(c.value)));
+  const cont = { disponivel: 0, agendado: 0, conversa: 0, semcelular: 0 };
+  for (const l of ELEGIVEIS) cont[grupoDe(l)]++;
+  for (const k of Object.keys(cont)) $("#ag_n_" + k).textContent = cont[k];
+  const q = semAcento($("#ag_busca").value.trim());
+  const rotulo = Object.fromEntries(ETAPAS);
+  const vis = ELEGIVEIS.filter((l) => grupoDe(l) === ABA_ELEG &&
+    (!q || semAcento(`${l.nome} ${l.cidade} ${l.uf} ${l.segmento}`).includes(q)));
+  $("#ag_th_sel").style.visibility = ABA_ELEG === "disponivel" ? "visible" : "hidden";
+  const situacao = (l) => {
+    if (!l.bloqueio) return '<span class="pill ok">disponível</span>';
+    if (l.bloqueio === "já agendado") return `<span class="pill warn">agendado${l.agendado_para ? " · " + quando(l.agendado_para) : ""}</span>`;
+    if (l.bloqueio === "já em conversa") return `<span class="pill ok">${esc(ROTULO_STATUS[l.conversa_status] || l.conversa_status || "em conversa")}</span>`;
+    return `<span class="pill warn">${esc(l.bloqueio)}</span>`;
+  };
+  $("#elegiveis-corpo").innerHTML = vis.map((l) => `
     <tr>
-      <td>${l.bloqueio ? "" : `<input type="checkbox" class="ag_sel" value="${l.id}">`}</td>
+      <td>${l.bloqueio ? "" : `<input type="checkbox" class="ag_sel" value="${l.id}" ${marcados.has(l.id) ? "checked" : ""}>`}</td>
       <td><b>${esc(l.nome)}</b>${!l.site_proprio ? ' <span class="selo semsite">sem site</span>' : ""}</td>
       <td>${esc(l.cidade || "")}${l.uf ? "/" + esc(l.uf) : ""}</td>
       <td>${esc(l.segmento || "")}</td>
-      <td>${l.bloqueio ? `<span class="pill warn">${esc(l.bloqueio)}</span>` : '<span class="pill ok">disponível</span>'}</td>
-    </tr>`).join("") || '<tr><td colspan="5" class="hint" style="padding:1rem">Nenhuma empresa com WhatsApp na base ainda.</td></tr>';
-  await carregarLotes();
+      <td class="hint">${esc(rotulo[l.etapa] || l.etapa)}</td>
+      <td>${situacao(l)}</td>
+    </tr>`).join("") || `<tr><td colspan="6" class="hint" style="padding:1rem">${ELEGIVEIS.length ? "Nada nesta aba" + (q ? " com essa busca" : "") + "." : "Nenhuma empresa com WhatsApp na base ainda."}</td></tr>`;
+  const todas = $("#ag_todas");
+  const caixas = [...document.querySelectorAll(".ag_sel")];
+  todas.checked = caixas.length > 0 && caixas.every((c) => c.checked);
 }
 function marcarTodas() {
   const on = $("#ag_todas").checked;
@@ -1108,7 +1201,9 @@ async function redefinirSenha(id, email) {
 /* ------------------------------ auditoria -------------------------------- */
 const ROTULO_ACAO = { LOGIN: "entrou", LOGIN_FALHOU: "falhou o login", SAIR: "saiu", SENHA: "senha", CRIAR: "criou",
   ATUALIZAR: "atualizou", EXCLUIR: "excluiu", FUNIL: "moveu no funil", MENSAGEM: "registrou contato", BUSCA: "captou leads" };
+let AUD_PAG = 1;
 async function carregarAuditoria(pagina) {
+  AUD_PAG = pagina;
   const q = $("#au_q").value.trim();
   const r = await api(`auditoria?pagina=${pagina}&limite=50${q ? "&q=" + encodeURIComponent(q) : ""}`);
   const paginas = Math.max(1, Math.ceil(r.total / r.limite));
