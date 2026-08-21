@@ -26,7 +26,7 @@ const crypto = require("node:crypto");
 const { abrirBanco } = require("./db");
 
 const ROOT = __dirname;
-const SISTEMA_VERSION = "1.0.0";
+const SISTEMA_VERSION = "1.1.0";
 const APP_DIR = path.join(ROOT, "restrito");
 
 /* Caminho do banco por env para a bateria de testes rodar num arquivo
@@ -148,6 +148,11 @@ db.exec(`
     criado_em TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_registros_lead ON registros_contato(lead_id);
+  CREATE TABLE IF NOT EXISTS municipios (
+    uf TEXT NOT NULL,
+    nome TEXT NOT NULL,
+    UNIQUE(uf, nome)
+  );
   CREATE TABLE IF NOT EXISTS auditoria (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     usuario_id INTEGER,
@@ -237,16 +242,20 @@ const chaveAnthropic = () => process.env.ANTHROPIC_API_KEY || getCfg("anthropic_
 const chavePlaces = () => process.env.GOOGLE_PLACES_API_KEY || getCfg("google_places_api_key") || "";
 const modeloIA = () => process.env.CLAUDE_MODEL || getCfg("ia_modelo") || "claude-sonnet-5";
 
+/* `Number(v) || padrao` engoliria o ZERO — e 0h é início de janela legítimo
+   (quem quer rodar madrugada adentro). Só o não-número cai no padrão. */
+const numOu = (v, padrao) => { const n = Number(v); return Number.isFinite(n) ? n : padrao; };
+
 function lerConfigIA() {
   return {
     ligada: getCfg("ia_ligada") === "1",
     tom: getCfg("ia_tom") || TOM_PADRAO,
     roteiro: getCfg("ia_roteiro") || ROTEIRO_PADRAO,
-    tetoDiario: Math.max(1, Number(getCfg("teto_diario")) || 20),
-    gapMinSeg: Math.max(5, Number(getCfg("gap_min_seg")) || 45),
-    gapMaxSeg: Math.max(5, Number(getCfg("gap_max_seg")) || 180),
-    janelaInicio: Number(getCfg("janela_inicio")) || 9,
-    janelaFim: Number(getCfg("janela_fim")) || 18,
+    tetoDiario: Math.max(1, numOu(getCfg("teto_diario"), 20)),
+    gapMinSeg: Math.max(5, numOu(getCfg("gap_min_seg"), 45)),
+    gapMaxSeg: Math.max(5, numOu(getCfg("gap_max_seg"), 180)),
+    janelaInicio: Math.min(23, Math.max(0, numOu(getCfg("janela_inicio"), 9))),
+    janelaFim: Math.min(24, Math.max(1, numOu(getCfg("janela_fim"), 18))),
     fimDeSemana: getCfg("fim_de_semana") === "1",
     fuso: getCfg("fuso") || "America/Recife",
     baseUrl: (getCfg("base_url") || "https://luizaugust.me").replace(/\/+$/, ""),
@@ -368,6 +377,28 @@ function espelharFunil(leadId, statusConversa) {
   if (lead && ETAPAS_AUTOMATICAS.has(lead.etapa)) {
     db.prepare("UPDATE leads SET etapa=?, atualizado_em=? WHERE id=?").run(alvo, agora(), leadId);
   }
+}
+
+/* ===========================================================================
+   MUNICÍPIOS — a lista oficial do IBGE, cacheada no banco.
+   O painel não fala com o IBGE direto (a CSP tranca o connect-src em 'self');
+   quem busca é o servidor, UMA vez por UF, e dali em diante a lista sai do
+   SQLite. Municípios brasileiros mudam raramente — cache sem validade serve.
+   ========================================================================== */
+const UFS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
+  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"];
+
+async function municipiosDe(uf) {
+  const cache = db.prepare("SELECT nome FROM municipios WHERE uf=? ORDER BY nome").all(uf);
+  if (cache.length) return cache.map((r) => r.nome);
+  const r = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios?orderBy=nome`);
+  if (!r.ok) throw new Error(`IBGE respondeu ${r.status} — tente de novo em instantes`);
+  const lista = await r.json();
+  const nomes = (Array.isArray(lista) ? lista : []).map((m) => m?.nome).filter(Boolean);
+  if (!nomes.length) throw new Error("IBGE devolveu lista vazia — tente de novo em instantes");
+  const inserir = db.prepare("INSERT OR IGNORE INTO municipios(uf,nome) VALUES(?,?)");
+  for (const n of nomes) inserir.run(uf, n);
+  return nomes;
 }
 
 /* ===========================================================================
@@ -1188,10 +1219,17 @@ async function rotaApi(req, res, rota) {
     }
   }
 
+  if (rota === "municipios" && m === "GET") {
+    const url = new URL(req.url, "http://x");
+    const uf = String(url.searchParams.get("uf") || "").toUpperCase();
+    if (!UFS.includes(uf)) return json(res, 400, { error: "UF inválida." });
+    return json(res, 200, { uf, cidades: await municipiosDe(uf) });
+  }
+
   if (rota === "captar" && m === "POST") {
     const { cidade, uf, nicho } = await lerCorpo(req);
     if (!cidade || !uf || !nicho) return json(res, 400, { error: "Informe cidade, UF e o segmento a buscar." });
-    if (!/^[A-Za-z]{2}$/.test(String(uf))) return json(res, 400, { error: "UF inválida (2 letras)." });
+    if (!UFS.includes(String(uf).toUpperCase())) return json(res, 400, { error: "UF inválida." });
     const r = await cacarLeads({ cidade: String(cidade).trim(), uf: String(uf).trim(), nicho: String(nicho).trim() });
     auditar(sessao, "BUSCA", "lead", null, `Captação: "${nicho}" em ${cidade}/${uf} — ${r.inseridos} novos de ${r.total}`, req);
     return json(res, 200, { ok: true, ...r });
@@ -1300,11 +1338,11 @@ async function rotaApi(req, res, rota) {
     if ("ia_modelo" in b && String(b.ia_modelo).trim()) setCfg("ia_modelo", String(b.ia_modelo).trim());
     /* Sanitização com clamp: janela/ritmo invertidos travariam o motor pra
        sempre — melhor corrigir na gravação do que confiar no formulário. */
-    if ("teto_diario" in b) setCfg("teto_diario", Math.min(500, Math.max(1, Number(b.teto_diario) || 20)));
-    if ("gap_min_seg" in b) setCfg("gap_min_seg", Math.max(5, Number(b.gap_min_seg) || 45));
-    if ("gap_max_seg" in b) setCfg("gap_max_seg", Math.max(Number(getCfg("gap_min_seg")) || 45, Number(b.gap_max_seg) || 180));
-    if ("janela_inicio" in b) setCfg("janela_inicio", Math.min(23, Math.max(0, Number(b.janela_inicio) || 9)));
-    if ("janela_fim" in b) setCfg("janela_fim", Math.min(24, Math.max((Number(getCfg("janela_inicio")) || 9) + 1, Number(b.janela_fim) || 18)));
+    if ("teto_diario" in b) setCfg("teto_diario", Math.min(500, Math.max(1, numOu(b.teto_diario, 20))));
+    if ("gap_min_seg" in b) setCfg("gap_min_seg", Math.max(5, numOu(b.gap_min_seg, 45)));
+    if ("gap_max_seg" in b) setCfg("gap_max_seg", Math.max(numOu(getCfg("gap_min_seg"), 45), numOu(b.gap_max_seg, 180)));
+    if ("janela_inicio" in b) setCfg("janela_inicio", Math.min(23, Math.max(0, numOu(b.janela_inicio, 9))));
+    if ("janela_fim" in b) setCfg("janela_fim", Math.min(24, Math.max(numOu(getCfg("janela_inicio"), 9) + 1, numOu(b.janela_fim, 18))));
     if ("fim_de_semana" in b) setCfg("fim_de_semana", b.fim_de_semana ? "1" : "0");
     if ("base_url" in b && /^https?:\/\//.test(String(b.base_url))) setCfg("base_url", String(b.base_url).replace(/\/+$/, ""));
     // chave vazia = "não mexer" (o GET nunca devolve a chave pro form reenviar)
@@ -1360,7 +1398,7 @@ function handleRestrito(req, res, pathname) {
       /* Erros de configuração/integração são "do usuário resolver" e podem
          aparecer por inteiro; o resto é 500 genérico (mensagem de exceção é
          mapa da casa pra quem estiver sondando). */
-      if (/Configure a chave|Google Places respondeu|IA respondeu|IA recusou|IA truncou|IA não devolveu|IA devolveu|link externo/i.test(e.message || ""))
+      if (/Configure a chave|Google Places respondeu|IBGE respondeu|IBGE devolveu|IA respondeu|IA recusou|IA truncou|IA não devolveu|IA devolveu|link externo/i.test(e.message || ""))
         return json(res, 502, { error: e.message });
       console.error(`  ✖ /restrito/api/${rota.slice(4)}:`, e.message);
       json(res, 500, { error: "Erro interno" });

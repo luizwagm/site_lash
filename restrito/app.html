@@ -92,6 +92,16 @@
     .aba.on{background:rgba(124,92,255,.15);color:var(--text);border-color:var(--violet)}
     .filtros{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem}
     .filtros input,.filtros select{width:auto;min-width:110px;padding:.45rem .7rem;font-size:.85rem}
+    .filtros .combo{width:auto;min-width:160px}
+    .filtros .combo input{width:100%}
+    /* select com busca: input + lista flutuante, sem biblioteca nenhuma */
+    .combo{position:relative}
+    .combo__lista{position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:250px;overflow-y:auto;
+      background:var(--surface2);border:1px solid var(--line2);border-radius:8px;z-index:30;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+    .combo__lista button{display:block;width:100%;text-align:left;padding:.45rem .8rem;border:0;background:none;font-size:.86rem;color:var(--text)}
+    .combo__lista button:hover{background:rgba(124,92,255,.18)}
+    .combo__vazio{padding:.5rem .8rem;color:var(--dim);font-size:.8rem}
+    .combo input[disabled]{opacity:.5}
     .check{display:inline-flex;align-items:center;gap:.35rem;font-size:.82rem;color:var(--muted);white-space:nowrap}
     .qr-box{display:grid;place-items:center;background:#fff;border-radius:12px;padding:1rem;width:min(320px,100%)}
     .qr-box svg{width:100%;height:auto}
@@ -155,9 +165,13 @@
         <h3 class="mb">Captar leads no Google</h3>
         <p class="hint mb">Busca empresas de QUALQUER segmento no Google Maps e traz nome, telefone, WhatsApp, site e avaliações. Quem já está na base não entra de novo.</p>
         <div class="row3">
-          <div><label>Segmento / nicho</label><input id="cp_nicho" placeholder="ex.: clínica odontológica, academia, restaurante"></div>
-          <div><label>Cidade</label><input id="cp_cidade" placeholder="Caruaru"></div>
-          <div><label>UF</label><input id="cp_uf" placeholder="PE" maxlength="2"></div>
+          <div><label>Segmento / nicho</label>
+            <div class="combo"><input id="cp_nicho" placeholder="busque: clínica, academia, restaurante…" autocomplete="off"><div class="combo__lista" hidden></div></div>
+          </div>
+          <div><label>Estado</label><select id="cp_uf"><option value="">— escolha —</option></select></div>
+          <div><label>Cidade</label>
+            <div class="combo"><input id="cp_cidade" placeholder="escolha o estado antes" autocomplete="off" disabled><div class="combo__lista" hidden></div></div>
+          </div>
         </div>
         <div class="right mt"><button class="btn btn-grad" id="cp_btn" onclick="captar()">Buscar e importar</button></div>
         <p class="hint mt" id="cp_log"></p>
@@ -181,9 +195,10 @@
 
       <div class="filtros">
         <input id="f_q" placeholder="Buscar por nome…" oninput="filtroDigitado()">
-        <input id="f_cidade" placeholder="Cidade" oninput="filtroDigitado()">
+        <select id="f_uf" onchange="mudouUfDoFiltro()"><option value="">Todos os estados</option></select>
+        <div class="combo"><input id="f_cidade" placeholder="Cidade" autocomplete="off" oninput="filtroDigitado()"><div class="combo__lista" hidden></div></div>
         <select id="f_etapa" onchange="carregarLeads()"><option value="">Todas as etapas</option></select>
-        <input id="f_segmento" placeholder="Segmento" oninput="filtroDigitado()">
+        <div class="combo"><input id="f_segmento" placeholder="Segmento" autocomplete="off" oninput="filtroDigitado()"><div class="combo__lista" hidden></div></div>
         <label class="check"><input type="checkbox" id="f_whatsapp" onchange="carregarLeads()"> só com WhatsApp</label>
         <label class="check"><input type="checkbox" id="f_semsite" onchange="carregarLeads()"> sem site próprio</label>
         <span class="hint" id="leads-total"></span>
@@ -399,6 +414,115 @@ function toast(msg, err = false) {
 }
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 const quando = (iso) => iso ? new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+
+/* --------------------- selects com busca (UF/cidade/segmento) ------------ */
+const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
+/* Catálogo de segmentos para a busca. É o texto que vai ao Google Maps, então
+   os nomes são os que as pessoas usam, não código CNAE. Dá para digitar um
+   que não esteja aqui — a lista sugere, não tranca. */
+const SEGMENTOS = [
+  // Saúde
+  "clínica médica","clínica odontológica","clínica de estética","clínica veterinária","clínica de fisioterapia",
+  "clínica de psicologia","clínica de nutrição","clínica de fonoaudiologia","clínica de oftalmologia","clínica de dermatologia",
+  "clínica de ortopedia","clínica de radiologia","laboratório de análises clínicas","farmácia","farmácia de manipulação",
+  "ótica","hospital","casa de repouso","home care","plano de saúde",
+  // Beleza
+  "salão de beleza","barbearia","esmalteria","estúdio de sobrancelhas","estúdio de cílios","estúdio de tatuagem",
+  "clínica de depilação","perfumaria","loja de cosméticos",
+  // Alimentação
+  "restaurante","restaurante self service","comida japonesa","comida italiana","churrascaria","pizzaria","hamburgueria",
+  "lanchonete","padaria","confeitaria","doceria","sorveteria","açaiteria","cafeteria","casa de sucos","marmitaria",
+  "buffet","bar","pub","food truck","distribuidora de bebidas","adega",
+  // Varejo
+  "supermercado","mercadinho","atacado","atacarejo","loja de roupas","loja de moda feminina","loja de moda masculina",
+  "loja de moda infantil","loja de lingerie","loja de calçados","loja de bolsas e acessórios","joalheria","relojoaria",
+  "loja de móveis","loja de colchões","loja de eletrodomésticos","loja de eletrônicos","loja de celulares",
+  "loja de informática","papelaria","livraria","loja de brinquedos","loja de presentes","loja de utilidades domésticas",
+  "loja de tecidos","armarinho","loja de tintas","loja de material de construção","madeireira","vidraçaria",
+  "loja de ferragens","autopeças","loja de pneus","bicicletaria","loja de instrumentos musicais","loja de artigos esportivos",
+  "loja de suplementos","loja de produtos naturais","tabacaria","floricultura","garden center","pet shop","agropecuária",
+  "brechó","loja de variedades","loja de departamentos","sex shop",
+  // Serviços
+  "escritório de contabilidade","escritório de advocacia","imobiliária","corretora de seguros","correspondente bancário",
+  "cartório","despachante","agência de viagens","agência de marketing","agência de publicidade","gráfica",
+  "comunicação visual","fotografia","produtora de vídeo","assistência técnica de celulares","assistência técnica de informática",
+  "conserto de eletrodomésticos","chaveiro","lavanderia","costureira","sapataria","lotérica","coworking",
+  "empresa de limpeza","dedetizadora","empresa de segurança","monitoramento de alarmes","segurança eletrônica",
+  "serralheria","marcenaria","marmoraria","tornearia","funilaria e pintura","oficina mecânica","oficina de motos",
+  "auto elétrica","lava jato","estacionamento","locadora de veículos","autoescola","transportadora","mudanças e fretes",
+  "entregas de motoboy","casa de festas e eventos","decoração de festas","aluguel de brinquedos para festas",
+  "som e iluminação","funerária","salão de eventos",
+  // Educação
+  "escola particular","escola infantil","creche","curso de idiomas","curso de informática","cursinho pré-vestibular",
+  "faculdade","escola de música","escola de dança","reforço escolar","curso técnico","curso profissionalizante",
+  // Esporte e lazer
+  "academia","estúdio de pilates","box de crossfit","escola de natação","quadra society","clube","escola de futebol",
+  "estúdio de yoga","hotel","pousada","hostel","motel","agência de turismo","parque de diversões","cinema","teatro",
+  // Construção e indústria
+  "construtora","escritório de engenharia","escritório de arquitetura","eletricista","encanador",
+  "instalação de ar-condicionado","energia solar","gesso e drywall","pintura predial","paisagismo e jardinagem",
+  "manutenção de piscinas","poços artesianos","topografia","confecção","facção de costura","malharia","bordados",
+  "estamparia","serigrafia","fábrica de móveis","metalúrgica","fábrica de alimentos","panificadora industrial",
+  "laticínios","frigorífico","cerâmica","olaria",
+  // Agro
+  "loja de produtos agrícolas","máquinas agrícolas","ração animal","avicultura","haras",
+  // Tecnologia e financeiro
+  "software house","startup","provedor de internet","automação residencial","cooperativa de crédito","fintech",
+  // Automotivo
+  "concessionária","revenda de veículos","revenda de motos","moto peças",
+  // Outros
+  "igreja","associação","ong","condomínio","game lounge","lan house","banca de revistas",
+].sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+const CIDADES = {};   // uf -> [nomes], vem do servidor (IBGE cacheado)
+async function cidadesDe(uf) {
+  if (!uf) return [];
+  if (!CIDADES[uf]) CIDADES[uf] = (await api("municipios?uf=" + uf)).cidades;
+  return CIDADES[uf];
+}
+const semAcento = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+/* Transforma um <input> dentro de .combo num select com busca. `obterOpcoes`
+   é função (as cidades mudam com a UF); `aoEscolher` avisa quem quer reagir. */
+function montarCombo(inputId, obterOpcoes, aoEscolher) {
+  const input = document.getElementById(inputId);
+  const lista = input.parentElement.querySelector(".combo__lista");
+  async function abrir() {
+    if (input.disabled) return;
+    let todas = [];
+    try { todas = await obterOpcoes(); } catch (e) { toast(e.message, true); return; }
+    const q = semAcento(input.value.trim());
+    const achadas = q ? todas.filter((o) => semAcento(o).includes(q)) : todas;
+    lista.innerHTML = achadas.slice(0, 200).map((o) => `<button type="button" data-v="${esc(o)}">${esc(o)}</button>`).join("") ||
+      '<div class="combo__vazio">Nada encontrado — pode usar o texto digitado.</div>';
+    lista.hidden = false;
+  }
+  function escolher(v) {
+    input.value = v; lista.hidden = true;
+    if (aoEscolher) aoEscolher(v);
+  }
+  input.addEventListener("focus", abrir);
+  input.addEventListener("input", abrir);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") lista.hidden = true;
+    if (e.key === "Enter" && !lista.hidden) {
+      const b = lista.querySelector("button");
+      if (b) { e.preventDefault(); escolher(b.dataset.v); }
+    }
+  });
+  // mousedown, não click: o blur do input fecharia a lista antes do click chegar
+  lista.addEventListener("mousedown", (e) => {
+    const b = e.target.closest("button");
+    if (b) { e.preventDefault(); escolher(b.dataset.v); }
+  });
+  input.addEventListener("blur", () => setTimeout(() => { lista.hidden = true; }, 150));
+}
+function mudouUfDoFiltro() {
+  $("#f_cidade").value = "";
+  const uf = $("#f_uf").value;
+  if (uf) cidadesDe(uf).catch(() => {});   // pré-carrega a lista
+  carregarLeads();
+}
 function alternar(id) { const el = document.getElementById(id); el.hidden = !el.hidden; }
 function fecharModal(id) { document.getElementById(id).hidden = true; }
 
@@ -424,6 +548,21 @@ async function mostrarApp() {
     selE.insertAdjacentHTML("beforeend", `<option value="${v}">${rotulo}</option>`);
     selL.insertAdjacentHTML("beforeend", `<option value="${v}">${rotulo}</option>`);
   }
+  // selects de UF + selects com busca (segmento e cidade dependente da UF)
+  const ufOpts = UFS.map((u) => `<option>${u}</option>`).join("");
+  $("#cp_uf").insertAdjacentHTML("beforeend", ufOpts);
+  $("#f_uf").insertAdjacentHTML("beforeend", ufOpts);
+  montarCombo("cp_nicho", () => SEGMENTOS);
+  montarCombo("cp_cidade", () => cidadesDe($("#cp_uf").value));
+  montarCombo("f_segmento", () => SEGMENTOS, () => carregarLeads());
+  montarCombo("f_cidade", () => cidadesDe($("#f_uf").value), () => carregarLeads());
+  $("#cp_uf").addEventListener("change", () => {
+    const uf = $("#cp_uf").value;
+    const cid = $("#cp_cidade");
+    cid.value = ""; cid.disabled = !uf;
+    cid.placeholder = uf ? "busque a cidade…" : "escolha o estado antes";
+    if (uf) cidadesDe(uf).catch((e) => toast(e.message, true));   // pré-carrega
+  });
   await Promise.all([carregarPainel(), carregarLeads(), carregarFunil(), carregarDiag(), carregarConfig(), carregarConversas()]);
   setInterval(() => { carregarDiag().catch(() => {}); if (!$("#a-conexao").hidden) carregarCanal().catch(() => {}); }, 5000);
 }
@@ -493,6 +632,7 @@ function filtroDigitado() { clearTimeout(filtroT); filtroT = setTimeout(carregar
 async function carregarLeads() {
   const q = new URLSearchParams();
   if ($("#f_q").value) q.set("q", $("#f_q").value);
+  if ($("#f_uf").value) q.set("uf", $("#f_uf").value);
   if ($("#f_cidade").value) q.set("cidade", $("#f_cidade").value);
   if ($("#f_etapa").value) q.set("etapa", $("#f_etapa").value);
   if ($("#f_segmento").value) q.set("segmento", $("#f_segmento").value);
