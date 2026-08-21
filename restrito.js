@@ -26,7 +26,7 @@ const crypto = require("node:crypto");
 const { abrirBanco } = require("./db");
 
 const ROOT = __dirname;
-const SISTEMA_VERSION = "1.4.1";
+const SISTEMA_VERSION = "1.5.0";
 const APP_VERSION_SITE = require("./package.json").version;   // a versão do SITE, mostrada no menu
 const APP_DIR = path.join(ROOT, "restrito");
 
@@ -245,6 +245,12 @@ for (const alt of [
   // mensagem RECUSADA fica registrada como "enviada" para sempre.
   "ALTER TABLE mensagens ADD COLUMN veredito TEXT",
   "ALTER TABLE mensagens ADD COLUMN veredito_em TEXT",
+  /* Restrição da conta do WhatsApp (código 463): iniciar conversa NOVA é
+     bloqueado, conversa existente continua. Enquanto durar, o motor não pode
+     mandar primeiro contato — insistir queima a fila e agrava a punição. */
+  "ALTER TABLE canal ADD COLUMN restrito_ate TEXT",
+  "ALTER TABLE canal ADD COLUMN restrito_motivo TEXT",
+  "ALTER TABLE canal ADD COLUMN cota_novas TEXT",
 ]) { try { db.exec(alt); } catch { /* já existe */ } }
 
 const agora = () => new Date().toISOString();
@@ -896,9 +902,13 @@ function enviadasHoje(cfg) {
   return db.prepare("SELECT COUNT(*) c FROM mensagens WHERE direcao='SAIDA' AND via_ia=1 AND dia_local=?")
     .get(diaLocal(cfg.fuso)).c;
 }
-function portaoDeEnvio(cfg, canal) {
+function portaoDeEnvio(cfg, canal, primeiroContato = true) {
   if (!cfg.ligada) return "automacao_desligada";
   if (!canal.isReady()) return "canal_offline";
+  /* Conta restrita bloqueia CONVERSA NOVA; a que já existe continua (é a
+     regra do próprio WhatsApp no 463). Por isso responder quem escreveu e
+     dar follow-up seguem liberados — só o primeiro contato para. */
+  if (primeiroContato && contaRestrita()) return "conta_restrita";
   if (!dentroDaJanela(cfg)) return "fora_da_janela";
   if (enviadasHoje(cfg) >= cfg.tetoDiario) return "teto_diario";
   return "ok";
@@ -1104,7 +1114,10 @@ async function tick(canal) {
     espelharFunil(c.lead_id, "SEM_RESPOSTA");
   }
 
-  const portao = portaoDeEnvio(cfg, canal);
+  /* Gate SEM a regra do primeiro contato: o que vale para tudo (automação,
+     canal, janela, teto). A restrição da conta é checada só na hora da
+     tarefa nova, logo abaixo. */
+  const portao = portaoDeEnvio(cfg, canal, false);
   if (portao !== "ok") return { primeiroContato: 0, followUps: 0, motivo: portao };
 
   // conversa começada vale mais que lead novo: follow-up primeiro
@@ -1117,6 +1130,11 @@ async function tick(canal) {
     const r = await executarFollowUp(pendente, canal, cfg);
     return { primeiroContato: 0, followUps: r.startsWith("enviado") ? 1 : 0, motivo: `follow-up: ${r}` };
   }
+
+  /* Daqui para baixo é CONVERSA NOVA — o que a conta restrita não pode
+     fazer. A fila fica intacta, esperando a restrição passar. */
+  const restricao = contaRestrita();
+  if (restricao) return { primeiroContato: 0, followUps: 0, motivo: "conta_restrita" };
 
   const tarefa = db.prepare(`SELECT * FROM tarefas
     WHERE status='PENDENTE' AND agendada_para <= ? AND (reivindicada_em IS NULL OR reivindicada_em < ?)
@@ -1156,7 +1174,8 @@ async function tratarEntrada(telefone, texto, idExterno, canal) {
   const atual = db.prepare("SELECT * FROM conversas WHERE id=?").get(conversa.id);
   if (!atual.ia_ligada || atual.dono_humano) return;
 
-  const portao = portaoDeEnvio(cfg, canal);
+  // responder quem escreveu é conversa EXISTENTE: a restrição não vale aqui
+  const portao = portaoDeEnvio(cfg, canal, false);
   if (portao !== "ok") {
     /* Voltar seco aqui deixaria a resposta ÓRFÃ para sempre: a entrada zerou
        a proxima_acao, e as duas consultas do tick filtram por
@@ -1209,6 +1228,72 @@ function registrarVeredito(idExterno, veredito) {
   const r = db.prepare("UPDATE mensagens SET veredito=?, veredito_em=? WHERE id_externo=? AND direcao='SAIDA'")
     .run(veredito, agora(), idExterno);
   if (r.changes) anunciar("conversas");
+  // 463 = o WhatsApp RECUSOU. A mensagem não chegou: desfaz o "enviada".
+  if (/^ERRO 463/.test(veredito)) desfazerEnvioRecusado(idExterno);
+}
+
+/* ===========================================================================
+   O ENVIO QUE O SERVIDOR RECUSOU
+   `sendMessage` resolve ao escrever no socket; a recusa chega depois, pelo
+   veredito. Sem isto, a empresa que NÃO recebeu nada ficaria marcada como
+   "mensagem enviada", entraria em follow-up ("você chegou a ver?") e nunca
+   mais seria abordada de verdade. Então: a mensagem vira registro de falha,
+   a conversa volta a AGENDADO, o lead volta a NOVO_LEAD e a tarefa retorna à
+   fila SEM contar tentativa — a recusa é da nossa conta, não culpa do lead.
+   ========================================================================== */
+function desfazerEnvioRecusado(idExterno) {
+  try {
+    const msg = db.prepare("SELECT * FROM mensagens WHERE id_externo=? AND direcao='SAIDA'").get(idExterno);
+    if (!msg) return;
+    const conversa = db.prepare("SELECT * FROM conversas WHERE id=?").get(msg.conversa_id);
+    if (!conversa) return;
+    const saidas = db.prepare("SELECT COUNT(*) c FROM mensagens WHERE conversa_id=? AND direcao='SAIDA'").get(conversa.id).c;
+    const entradas = db.prepare("SELECT COUNT(*) c FROM mensagens WHERE conversa_id=? AND direcao='ENTRADA'").get(conversa.id).c;
+    /* Só desfaz o PRIMEIRO CONTATO. Numa conversa que já existe, a recusa é
+       de uma mensagem no meio do fio — a conversa continua de pé, e apagar o
+       histórico dela seria pior que registrar a falha. */
+    if (saidas !== 1 || entradas > 0) return;
+    db.prepare("UPDATE conversas SET status='AGENDADO', follow_up_etapa=0, follow_up_falhas=0, proxima_acao=NULL, ultima_saida=NULL, atualizado_em=? WHERE id=?")
+      .run(agora(), conversa.id);
+    const lead = db.prepare("SELECT etapa FROM leads WHERE id=?").get(conversa.lead_id);
+    if (lead && ETAPAS_AUTOMATICAS.has(lead.etapa))
+      db.prepare("UPDATE leads SET etapa='NOVO_LEAD', atualizado_em=? WHERE id=?").run(agora(), conversa.lead_id);
+    db.prepare(`UPDATE tarefas SET status='PENDENTE', reivindicada_em=NULL,
+        tentativas=CASE WHEN tentativas>0 THEN tentativas-1 ELSE 0 END,
+        ultimo_erro='recusada pelo WhatsApp (463) — reagendada', enviada_em=NULL
+      WHERE conversa_id=? AND status='ENVIADO'`).run(conversa.id);
+    anunciar("leads"); anunciar("fila"); anunciar("conversas");
+    console.log(`  · envio recusado (463) desfeito — lead ${conversa.lead_id} volta para a fila`);
+  } catch (e) { console.error("  ✖ desfazer envio recusado:", e.message); }
+}
+
+/* Conserto retroativo: recusa registrada ANTES desta versão (quando o código
+   do erro nem era lido) deixou empresas marcadas como "mensagem enviada" sem
+   terem recebido nada. Idempotente — só age em conversa de primeiro contato
+   ainda pendurada, e nada faz quando não há o que consertar. */
+function repararRecusasAntigas() {
+  try {
+    const antigas = db.prepare(`SELECT m.id_externo FROM mensagens m JOIN conversas c ON c.id=m.conversa_id
+      WHERE m.direcao='SAIDA' AND m.veredito LIKE 'ERRO%' AND m.id_externo IS NOT NULL
+        AND c.status='ENVIADO' LIMIT 200`).all();
+    for (const { id_externo } of antigas) desfazerEnvioRecusado(id_externo);
+    if (antigas.length) console.log(`· /restrito: ${antigas.length} envio(s) recusado(s) revisado(s) — leads devolvidos à fila`);
+  } catch (e) { console.error("  ✖ reparo de recusas:", e.message); }
+}
+
+/* Restrição da conta, publicada pelo worker (consulta oficial do WhatsApp). */
+function publicarRestricao({ ate, motivo, cota }) {
+  db.prepare("UPDATE canal SET restrito_ate=?, restrito_motivo=?, cota_novas=? WHERE id='wa'")
+    .run(ate || null, motivo || null, cota ? JSON.stringify(cota) : null);
+  anunciar("canal"); anunciar("diagnostico");
+}
+/* Sem data de término, a restrição vale por 24h a partir do registro: melhor
+   segurar por um dia do que martelar uma conta punida por tempo indefinido. */
+function contaRestrita() {
+  const c = db.prepare("SELECT restrito_ate, restrito_motivo FROM canal WHERE id='wa'").get();
+  if (!c || !c.restrito_ate) return null;
+  if (new Date(c.restrito_ate).getTime() <= Date.now()) return null;
+  return { ate: c.restrito_ate, motivo: c.restrito_motivo };
 }
 
 /* --------------------- Canal (estado publicado no banco) ----------------- */
@@ -1263,12 +1348,18 @@ function diagnostico() {
   if (!cfg.ligada) impedimentos.push("automacao_desligada");
   if (!canal.workerVivo) impedimentos.push("worker_offline");
   else if (canal.estado !== "CONECTADO") impedimentos.push("whatsapp_desconectado");
+  const restricao = contaRestrita();
+  if (restricao) impedimentos.push("conta_restrita");
   if (!dentroDaJanela(cfg)) impedimentos.push("fora_da_janela");
   const enviadas = enviadasHoje(cfg);
   if (enviadas >= cfg.tetoDiario) impedimentos.push("teto_diario");
+  let cota = null;
+  try { cota = canal.cota_novas ? JSON.parse(canal.cota_novas) : null; } catch {}
   return {
     pronto: impedimentos.length === 0,
     impedimentos,
+    restricao,   // { ate, motivo } — conversa nova bloqueada; as existentes seguem
+    cota,        // cota de conversas NOVAS, quando o WhatsApp informa
     enviadasHoje: enviadas,
     tetoDiario: cfg.tetoDiario,
     naFila: db.prepare("SELECT COUNT(*) c FROM tarefas WHERE status='PENDENTE'").get().c,
@@ -1356,6 +1447,7 @@ async function resolverGeoip(ip) {
 function iniciarServicos() {
   if (servicosLigados) return;
   servicosLigados = true;
+  repararRecusasAntigas();
   // ponto de partida do repasse: o que já está na tabela não é novidade
   for (const r of db.prepare("SELECT assunto, seq FROM eventos").all()) seqVista[r.assunto] = r.seq;
   setInterval(() => {
@@ -1929,7 +2021,7 @@ module.exports = {
   motor: {
     tick, tratarEntrada, tratarEcoHumano,
     lerConfigIA, proximoIntervaloMs,
-    variantesTelefoneBr, registrarVeredito,
+    variantesTelefoneBr, registrarVeredito, publicarRestricao, contaRestrita,
     ...canalStatus,
   },
 };

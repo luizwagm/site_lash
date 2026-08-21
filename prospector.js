@@ -61,10 +61,20 @@ if (!SECO) {
   }
 }
 
-/* Logger mudo no formato que o Baileys espera (pino-like). */
+/* Logger quase mudo: `trace/debug/info` do Baileys é um dilúvio, mas WARN e
+   ERROR são justamente onde aparece "received error in ack" — o rastro de uma
+   mensagem recusada. Sem eles, a recusa vira um mistério no journalctl. */
 const logSilencioso = {
-  level: "silent", child() { return this; },
-  trace() {}, debug() {}, info() {}, warn() {}, error() {}, fatal() {},
+  level: "warn", child() { return this; },
+  trace() {}, debug() {}, info() {},
+  warn: (...a) => console.error("  ⚠ wa:", ...a.map(resumir)),
+  error: (...a) => console.error("  ✖ wa:", ...a.map(resumir)),
+  fatal: (...a) => console.error("  ✖✖ wa:", ...a.map(resumir)),
+};
+// objeto do pino vira uma linha só; sem isto o log escorre por 30 linhas
+const resumir = (v) => {
+  if (typeof v !== "object" || v === null) return v;
+  try { return JSON.stringify(v).slice(0, 400); } catch { return "[objeto]"; }
 };
 
 /* O canal aponta SEMPRE para o socket atual — sobrevive a reconexões. */
@@ -120,6 +130,34 @@ let conectado = false;
    do humano digitando no celular (assumir a conversa). */
 const nossas = new Set();
 
+/* ===========================================================================
+   COMO ESTÁ A NOSSA CONTA
+   O WhatsApp responde duas perguntas: se há restrição para iniciar conversa
+   nova (`reachout timelock`, o tal 463) e quanto ainda cabe da cota de
+   conversas novas. Perguntar é melhor que adivinhar pelo erro: vem a DATA em
+   que a punição termina, e é ela que o motor usa para voltar sozinho.
+   ========================================================================== */
+async function conferirRestricao(textoDaRecusa) {
+  if (!sock) return;
+  let ate = null, motivo = textoDaRecusa || null, cota = null;
+  try {
+    const r = await sock.fetchAccountReachoutTimelock();
+    if (r?.isActive) {
+      ate = r.timeEnforcementEnds ? new Date(r.timeEnforcementEnds).toISOString() : null;
+      motivo = motivo || `conta restrita para iniciar conversas novas (${r.enforcementType || "padrão"})`;
+    } else if (!textoDaRecusa) {
+      motivo = null;   // consulta limpa e sem recusa recente: nada a registrar
+    }
+  } catch (e) { console.error("  ✖ consulta de restrição:", e.message); }
+  try { cota = await sock.fetchNewChatMessageCap(); } catch { /* nem toda conta responde */ }
+  /* Recusa sem data: segura por 24h. Melhor esperar um dia do que martelar
+     uma conta punida e transformar restrição temporária em bloqueio. */
+  if (motivo && !ate) ate = new Date(Date.now() + 24 * 3600e3).toISOString();
+  motor.publicarRestricao({ ate, motivo, cota });
+  if (motivo) console.error(`  ⚠ CONTA RESTRITA até ${ate} — primeiro contato pausado. ${motivo}`);
+  else console.log("  · conta sem restrição para iniciar conversas");
+}
+
 /* Debounce por contato + fila serial. */
 const pendentes = new Map();   // telefone -> { textos, idExterno, timer }
 let cadeia = Promise.resolve();
@@ -161,6 +199,8 @@ async function conectar() {
       const fone = s.user?.id ? s.user.id.split(":")[0] : null;
       motor.publicarConectado(fone);
       console.log(`  ✓ WhatsApp conectado${fone ? ` (${fone})` : ""}`);
+      // ao conectar, pergunta ao WhatsApp como está a conta (restrição e cota)
+      conferirRestricao().catch(() => {});
     }
     if (u.connection === "close") {
       conectado = false;
@@ -194,8 +234,15 @@ async function conectar() {
       else if (st === 3) veredito = "ENTREGUE";
       else if (st === 4 || st === 5) veredito = "LIDA";
       else if (st === 0 || u.update?.error) {
-        const codigo = u.update?.error?.code || u.update?.error?.output?.statusCode || "";
+        /* O CÓDIGO VEM EM `messageStubParameters`, não em `update.error` —
+           era o que fazia o veredito sair como "ERRO" pelado, sem dizer qual.
+           [0] é o código ("463", "479"…) e [1], quando existe, o texto da
+           restrição de conta. */
+        const par = u.update?.messageStubParameters || [];
+        const codigo = String(par[0] ?? u.update?.error?.code ?? "").trim();
         veredito = ("ERRO " + codigo).trim();
+        console.error(`  ✖ mensagem recusada pelo WhatsApp (${codigo || "sem código"})${par[1] ? " — " + par[1] : ""}`);
+        if (codigo === "463") conferirRestricao(par[1]);
       }
       if (veredito) {
         try { motor.registrarVeredito(id, veredito); }

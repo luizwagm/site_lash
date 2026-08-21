@@ -801,7 +801,7 @@ document.querySelectorAll(".aba[data-a]").forEach((b) =>
 const NOMES_IMPEDIMENTO = {
   automacao_desligada: "automação desligada", worker_offline: "worker do WhatsApp fora do ar",
   whatsapp_desconectado: "WhatsApp desconectado (escaneie o QR)", fora_da_janela: "fora da janela de horário",
-  teto_diario: "teto diário atingido",
+  teto_diario: "teto diário atingido", conta_restrita: "conta restrita para iniciar conversas novas",
 };
 async function carregarPainel() {
   const funil = await api("funil");
@@ -819,11 +819,27 @@ async function carregarDiag() {
     <div class="stat"><b>${d.naFila}</b><span>na fila</span></div>
     <div class="stat"><b>${d.atrasadas}</b><span>vencidas</span></div>
     <div class="stat"><b>${d.followUpsVencidos}</b><span>follow-ups devidos</span></div>
-    ${d.recusadas24h ? `<div class="stat" style="border-color:rgba(255,92,122,.5)"><b style="color:var(--red)">${d.recusadas24h}</b><span>recusadas 24h — conta pode estar restrita</span></div>` : ""}
+    ${d.recusadas24h ? `<div class="stat" style="border-color:rgba(255,92,122,.5)"><b style="color:var(--red)">${d.recusadas24h}</b><span>recusadas pelo WhatsApp · 24h</span></div>` : ""}
     <div class="stat"><b>${d.janela.inicio}–${d.janela.fim}h</b><span>janela (${esc(d.janela.fuso)})</span></div>`;
-  const imp = d.pronto
+  let imp = d.pronto
     ? `<span class="pill ok">✓ pronta para enviar</span>`
     : d.impedimentos.map((i) => `<span class="pill err">✕ ${NOMES_IMPEDIMENTO[i] || i}</span>`).join(" ");
+  /* A restrição merece explicação, não só um selo: ela não é defeito nosso,
+     e o que a pessoa precisa saber é o que ainda funciona e quando volta. */
+  if (d.restricao) {
+    imp += `<div class="card mt" style="border-color:rgba(255,201,92,.45);background:rgba(255,201,92,.07)">
+      <b style="color:var(--amber)">O WhatsApp restringiu esta conta para iniciar conversas novas.</b>
+      <p style="margin:.4rem 0 0;font-size:.86rem;color:var(--muted)">
+        As mensagens de <b>primeiro contato</b> estão pausadas até <b>${quando(d.restricao.ate)}</b> — a fila fica intacta e
+        o envio volta sozinho. <b>Responder quem já escreveu e os follow-ups continuam funcionando</b> (o WhatsApp bloqueia
+        só a conversa nova). O que costuma causar: muitos primeiros contatos com desconhecidos em pouco tempo, ou pessoas
+        marcando a conta como spam. Ao voltar, vale reduzir o teto diário e aumentar o intervalo entre envios.
+        ${d.restricao.motivo ? `<br><span class="hint">${esc(d.restricao.motivo)}</span>` : ""}
+      </p></div>`;
+  }
+  if (d.cota && (d.cota.quota != null || d.cota.usage != null)) {
+    imp += `<p class="hint mt">Cota de conversas novas informada pelo WhatsApp: ${esc(String(d.cota.usage ?? "?"))} de ${esc(String(d.cota.quota ?? "?"))}.</p>`;
+  }
   $("#diag-stats").innerHTML = stats; $("#diag-impedimentos").innerHTML = imp;
   $("#pr-diag").innerHTML = stats; $("#pr-impedimentos").innerHTML = imp;
   $("#pr_ligada").checked = !d.impedimentos.includes("automacao_desligada");
