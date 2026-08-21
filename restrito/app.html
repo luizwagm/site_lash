@@ -249,7 +249,8 @@
           <h3 class="mb">Agendar lote de primeiro contato</h3>
           <p class="hint mb">Só entram empresas com celular, sem opt-out, sem tarefa pendente e sem conversa em andamento. O motor envia UMA por vez, com intervalo humano, dentro da janela.</p>
           <div class="row">
-            <div><label>Quando começar</label><input type="datetime-local" id="ag_quando"></div>
+            <div><label>Quando começar</label><input type="datetime-local" id="ag_quando" onchange="avisarJanela()">
+              <p class="hint" id="ag_aviso_janela" style="margin-top:.3rem"></p></div>
             <div><label>Nota do lote (opcional)</label><input id="ag_nota" placeholder="ex.: clínicas de Caruaru"></div>
           </div>
           <div class="right mt">
@@ -263,7 +264,9 @@
             <tbody id="elegiveis-corpo"></tbody>
           </table>
         </div>
-        <div class="card"><h3 class="mb">Lotes recentes</h3><div id="lotes-lista" class="hint"></div></div>
+        <div class="card"><h3 class="mb">Lotes recentes</h3><div id="lotes-lista" class="hint"></div>
+          <p class="hint mt">A fila anda por horário crescente: um lote atrasado é drenado ANTES de um mais
+          novo que acabou de vencer. Cancelar a fila só alcança o que ainda não saiu — mensagem entregue fica no histórico.</p></div>
       </div>
 
       <div id="a-conexao" hidden>
@@ -602,13 +605,16 @@ async function carregarPainel() {
   $("#painel-funil").innerHTML = funil.etapas.map(([v, rotulo]) =>
     `<div class="stat"><b>${porEtapa[v] || 0}</b><span>${esc(rotulo)}</span></div>`).join("");
 }
+let JANELA = null;   // guardada do diagnóstico para o aviso do agendamento
 async function carregarDiag() {
   const d = await api("prospeccao/diagnostico");
+  JANELA = d.janela;
   const stats = `
     <div class="stat"><b>${d.enviadasHoje}/${d.tetoDiario}</b><span>enviadas hoje</span></div>
     <div class="stat"><b>${d.naFila}</b><span>na fila</span></div>
     <div class="stat"><b>${d.atrasadas}</b><span>vencidas</span></div>
     <div class="stat"><b>${d.followUpsVencidos}</b><span>follow-ups devidos</span></div>
+    ${d.recusadas24h ? `<div class="stat" style="border-color:rgba(255,92,122,.5)"><b style="color:var(--red)">${d.recusadas24h}</b><span>recusadas 24h — conta pode estar restrita</span></div>` : ""}
     <div class="stat"><b>${d.janela.inicio}–${d.janela.fim}h</b><span>janela (${esc(d.janela.fuso)})</span></div>`;
   const imp = d.pronto
     ? `<span class="pill ok">✓ pronta para enviar</span>`
@@ -787,9 +793,14 @@ async function abrirConversa(id) {
   conversaAberta = r.conversa;
   $("#cv_titulo").textContent = r.conversa.nome;
   $("#cv_sub").textContent = `${ROTULO_STATUS[r.conversa.status] || r.conversa.status} · IA ${r.conversa.ia_ligada ? "ativa" : "desligada"} · ${r.conversa.whatsapp || "sem zap"}`;
+  const rotuloVeredito = (v) => {
+    if (!v) return "";
+    if (v.startsWith("ERRO")) return ` · <b style="color:var(--red)">RECUSADA${v.slice(4) ? " (" + esc(v.slice(5)) + ")" : ""}</b>`;
+    return " · " + ({ SERVIDOR: "no servidor", ENTREGUE: "entregue ✓✓", LIDA: "lida" }[v] || esc(v.toLowerCase()));
+  };
   $("#cv_fio").innerHTML = r.mensagens.map((x) => `
     <div class="balao ${x.direcao === "ENTRADA" ? "entrada" : "saida"}">${esc(x.corpo)}
-      <span class="quando">${x.direcao === "SAIDA" ? (x.via_ia ? "IA · " : "nós · ") : "empresa · "}${quando(x.criado_em)}</span>
+      <span class="quando">${x.direcao === "SAIDA" ? (x.via_ia ? "IA · " : "nós · ") : "empresa · "}${quando(x.criado_em)}${x.direcao === "SAIDA" ? rotuloVeredito(x.veredito) : ""}</span>
     </div>`).join("") || '<p class="hint">Sem mensagens ainda.</p>';
   $("#modal-conversa").hidden = false;
 }
@@ -837,8 +848,32 @@ async function carregarLotes() {
   $("#lotes-lista").innerHTML = lotes.map((l) => {
     const t = l.tarefas;
     const partes = Object.entries(t).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(" · ");
-    return `<div style="padding:.3rem 0;border-bottom:1px solid var(--line)">${quando(l.agendado_para)} — ${esc(l.nota || "sem nota")} · ${partes || "vazio"}</div>`;
+    const pendentes = t.PENDENTE || 0;
+    const acao = pendentes
+      ? `<button class="btn btn-danger btn-sm" onclick="cancelarLote(${l.id},${pendentes})">Cancelar fila (${pendentes})</button>`
+      : `<span class="pill">—</span>`;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:.8rem;padding:.35rem 0;border-bottom:1px solid var(--line)">
+      <span>${quando(l.agendado_para)} — ${esc(l.nota || "sem nota")} · ${partes || "vazio"}</span>${acao}</div>`;
   }).join("") || "Nenhum lote ainda.";
+}
+async function cancelarLote(id, pendentes) {
+  if (!confirm(`Cancelar ${pendentes} contato(s) que ainda não saíram deste lote?\n\nO que já foi enviado permanece no histórico.`)) return;
+  try {
+    const r = await api("prospeccao/lotes/" + id, "DELETE");
+    toast(`${r.cancelados} contato(s) cancelado(s).`);
+    carregarElegiveis(); carregarDiag();
+  } catch (e) { toast(e.message, true); }
+}
+function avisarJanela() {
+  const el = $("#ag_aviso_janela");
+  el.textContent = "";
+  const v = $("#ag_quando").value;
+  if (!v || !JANELA) return;
+  const hora = new Date(v).getHours();
+  if (hora < JANELA.inicio || hora >= JANELA.fim) {
+    el.textContent = `⚠ ${hora}h está fora da janela (${JANELA.inicio}–${JANELA.fim}h) — o lote só dispara quando ela abrir.`;
+    el.style.color = "var(--amber)";
+  }
 }
 
 /* ------------------------------ conexão ---------------------------------- */

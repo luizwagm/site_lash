@@ -26,7 +26,7 @@ const crypto = require("node:crypto");
 const { abrirBanco } = require("./db");
 
 const ROOT = __dirname;
-const SISTEMA_VERSION = "1.1.1";
+const SISTEMA_VERSION = "1.2.0";
 const APP_DIR = path.join(ROOT, "restrito");
 
 /* Caminho do banco por env para a bateria de testes rodar num arquivo
@@ -165,6 +165,15 @@ db.exec(`
   );
 `);
 db.prepare("INSERT OR IGNORE INTO canal(id) VALUES('wa')").run();
+
+/* Migração leve — o CREATE IF NOT EXISTS não altera tabela existente. */
+for (const alt of [
+  // veredito do WhatsApp por mensagem: o sendMessage resolve quando ESCREVEU
+  // no socket, não quando o servidor aceitou — sem escutar a resposta, uma
+  // mensagem RECUSADA fica registrada como "enviada" para sempre.
+  "ALTER TABLE mensagens ADD COLUMN veredito TEXT",
+  "ALTER TABLE mensagens ADD COLUMN veredito_em TEXT",
+]) { try { db.exec(alt); } catch { /* já existe */ } }
 
 const agora = () => new Date().toISOString();
 
@@ -342,6 +351,30 @@ function normalizarTelefoneBr(v) {
 }
 /* Fixo nunca vira WhatsApp: 13 dígitos e o 9 na frente do número local. */
 const celularBr = (e164) => !!e164 && e164.length === 13 && e164.startsWith("55") && e164[4] === "9";
+
+/* O NONO DÍGITO: a linha brasileira tem 9 dígitos, mas a CONTA do WhatsApp
+   costuma estar registrada SEM o 9 fora de SP/RJ. Mandar para o formato errado
+   não dá erro — o servidor aceita, devolve id, e nada é entregue. Estas são as
+   duas formas possíveis de um mesmo número; o worker pergunta ao WhatsApp qual
+   delas tem conta, e a busca do inbound aceita as duas. */
+function variantesTelefoneBr(e164) {
+  if (!e164) return [];
+  const v = new Set([e164]);
+  if (e164.length === 13 && e164[4] === "9") v.add(e164.slice(0, 4) + e164.slice(5));   // tira o nono
+  if (e164.length === 12) v.add(e164.slice(0, 4) + "9" + e164.slice(4));                // põe o nono
+  return [...v];
+}
+/* O exato vem PRIMEIRO: com duas empresas em variantes uma da outra, a
+   igualdade decide — cair na conversa errada é pior que não achar. */
+function acharLeadPorTelefone(fone) {
+  const exato = db.prepare("SELECT * FROM leads WHERE whatsapp=?").get(fone);
+  if (exato) return exato;
+  for (const v of variantesTelefoneBr(fone)) {
+    const l = db.prepare("SELECT * FROM leads WHERE whatsapp=?").get(v);
+    if (l) return l;
+  }
+  return null;
+}
 
 /* --------------------------- Funil (etapas) ------------------------------ */
 /* Adaptado da representação de confecção para a agência: "catálogo" virou
@@ -810,7 +843,19 @@ async function executarTarefa(tarefa, canal, cfg) {
 
   let envio;
   try { envio = await canal.send(lead.whatsapp, decisao.mensagem); }
-  catch (e) { return devolver(`envio: ${e.message}`); }
+  catch (e) {
+    /* Número SEM CONTA de WhatsApp é falha PERMANENTE: gastar 3 tentativas
+       aqui terminaria sem explicação. Cancela com motivo claro e o lead vai
+       para o balde certo (SEM_WHATSAPP) — se a etapa ainda for da automação. */
+    if (e.codigo === "SEM_CONTA_WHATSAPP") {
+      atualizarConversa(conversa.id, { status: "FALHOU", proxima_acao: null });
+      const l = db.prepare("SELECT etapa FROM leads WHERE id=?").get(lead.id);
+      if (l && ETAPAS_AUTOMATICAS.has(l.etapa))
+        db.prepare("UPDATE leads SET etapa='SEM_WHATSAPP', atualizado_em=? WHERE id=?").run(agora(), lead.id);
+      return cancelar("número sem conta de WhatsApp");
+    }
+    return devolver(`envio: ${e.message}`);
+  }
 
   /* A mensagem SAIU: daqui em diante nada devolve a tarefa à fila — falha de
      gravação vira log, nunca reenvio (o destinatário receberia em dobro). */
@@ -869,7 +914,16 @@ async function executarFollowUp(conversa, canal, cfg) {
 
   let envio;
   try { envio = await canal.send(lead.whatsapp, decisao.mensagem); }
-  catch (e) { return falhaDeFollowUp(conversa, e.message); }
+  catch (e) {
+    if (e.codigo === "SEM_CONTA_WHATSAPP") {
+      atualizarConversa(conversa.id, { status: "FALHOU", proxima_acao: null });
+      const l = db.prepare("SELECT etapa FROM leads WHERE id=?").get(lead.id);
+      if (l && ETAPAS_AUTOMATICAS.has(l.etapa))
+        db.prepare("UPDATE leads SET etapa='SEM_WHATSAPP', atualizado_em=? WHERE id=?").run(agora(), lead.id);
+      return "sem conta de WhatsApp";
+    }
+    return falhaDeFollowUp(conversa, e.message);
+  }
 
   try { gravarMensagem(conversa.id, "SAIDA", decisao.mensagem, true, envio.externalId, cfg); }
   catch (e) { console.error("  ✖ pós-envio:", e.message); }
@@ -944,7 +998,8 @@ async function tick(canal) {
 async function tratarEntrada(telefone, texto, idExterno, canal) {
   const fone = normalizarTelefoneBr(telefone);
   if (!fone) return;
-  const lead = db.prepare("SELECT * FROM leads WHERE whatsapp=?").get(fone);
+  // a resposta pode chegar da variante sem/com o nono dígito — as duas casam
+  const lead = acharLeadPorTelefone(fone);
   if (!lead) { console.log(`  · mensagem de ${fone} sem lead correspondente — ignorada`); return; }
 
   const cfg = lerConfigIA();
@@ -966,7 +1021,15 @@ async function tratarEntrada(telefone, texto, idExterno, canal) {
   if (!atual.ia_ligada || atual.dono_humano) return;
 
   const portao = portaoDeEnvio(cfg, canal);
-  if (portao !== "ok") { console.log(`  · resposta de ${lead.nome} aguarda a janela (${portao})`); return; }
+  if (portao !== "ok") {
+    /* Voltar seco aqui deixaria a resposta ÓRFÃ para sempre: a entrada zerou
+       a proxima_acao, e as duas consultas do tick filtram por
+       proxima_acao <= agora — NULL nunca casa. Reagendar para JÁ faz o
+       primeiro tick dentro da janela responder. */
+    atualizarConversa(conversa.id, { proxima_acao: agora() });
+    console.log(`  · resposta de ${lead.nome} aguarda a janela (${portao})`);
+    return;
+  }
 
   let decisao;
   try {
@@ -992,7 +1055,7 @@ async function tratarEntrada(telefone, texto, idExterno, canal) {
 function tratarEcoHumano(telefone, texto, idExterno) {
   const fone = normalizarTelefoneBr(telefone);
   if (!fone) return;
-  const lead = db.prepare("SELECT * FROM leads WHERE whatsapp=?").get(fone);
+  const lead = acharLeadPorTelefone(fone);
   if (!lead) return;
   const cfg = lerConfigIA();
   const conversa = conversaDoLead(lead.id);
@@ -1000,6 +1063,15 @@ function tratarEcoHumano(telefone, texto, idExterno) {
   gravarMensagem(conversa.id, "SAIDA", texto, false, idExterno, cfg);
   atualizarConversa(conversa.id, { status: "ASSUMIDO_HUMANO", ia_ligada: 0, proxima_acao: null, ultima_saida: agora() });
   espelharFunil(lead.id, "ASSUMIDO_HUMANO");
+}
+
+/* O worker escuta messages.update e grava aqui o que o SERVIDOR disse de cada
+   mensagem (SERVIDOR/ENTREGUE/LIDA/ERRO+código). Só SAÍDA: um recibo de leitura
+   nosso não pode reescrever o registro do que a empresa mandou. */
+function registrarVeredito(idExterno, veredito) {
+  if (!idExterno || !veredito) return;
+  db.prepare("UPDATE mensagens SET veredito=?, veredito_em=? WHERE id_externo=? AND direcao='SAIDA'")
+    .run(veredito, agora(), idExterno);
 }
 
 /* --------------------- Canal (estado publicado no banco) ----------------- */
@@ -1068,6 +1140,11 @@ function diagnostico() {
     followUpsVencidos: db.prepare(`SELECT COUNT(*) c FROM conversas
       WHERE status IN ('ENVIADO','RESPONDEU') AND ia_ligada=1 AND dono_humano IS NULL
         AND proxima_acao IS NOT NULL AND proxima_acao <= ?`).get(agora()).c,
+    /* Recusa em cima de recusa é sinal de conta restrita para iniciar
+       conversa (código 463) — o painel avisa em vez de fingir que enviou. */
+    recusadas24h: db.prepare(`SELECT COUNT(*) c FROM mensagens
+      WHERE direcao='SAIDA' AND veredito LIKE 'ERRO%' AND criado_em >= ?`)
+      .get(new Date(Date.now() - 24 * 3600e3).toISOString()).c,
     janela: { inicio: cfg.janelaInicio, fim: cfg.janelaFim, fimDeSemana: cfg.fimDeSemana, fuso: cfg.fuso },
   };
 }
@@ -1285,6 +1362,22 @@ async function rotaApi(req, res, rota) {
     auditar(sessao, "CRIAR", "lote", r.loteId, `Lote de prospecção: ${r.criados} tarefas`, req);
     return json(res, 200, { ok: true, ...r });
   }
+  const mlote = rota.match(/^prospeccao\/lotes\/(\d+)$/);
+  if (mlote && m === "DELETE") {
+    if (sessao.papel !== "admin") return json(res, 403, { error: "Só o admin cancela prospecção" });
+    const lote = db.prepare("SELECT * FROM lotes WHERE id=?").get(mlote[1]);
+    if (!lote) return json(res, 404, { error: "Lote não encontrado" });
+    /* Só mexe no que ainda NÃO saiu: PENDENTE vira CANCELADO. O que já foi
+       enviado permanece no histórico — não dá para desfazer mensagem entregue,
+       e apagar o registro esconderia conversa real que pode receber resposta.
+       O claim é liberado junto para nada ficar em estado intermediário. */
+    const r = db.prepare(`UPDATE tarefas SET status='CANCELADO', ultimo_erro='cancelado no painel',
+        reivindicada_em=NULL WHERE lote_id=? AND status='PENDENTE'`).run(mlote[1]);
+    auditar(sessao, "ATUALIZAR", "lote", lote.id,
+      `Cancelou ${r.changes} contato(s) pendente(s) do lote de ${lote.agendado_para}`, req);
+    return json(res, 200, { ok: true, cancelados: r.changes });
+  }
+
   if (rota === "prospeccao/conversas" && m === "GET") {
     const url = new URL(req.url, "http://x");
     const filtro = url.searchParams.get("status");
@@ -1443,6 +1536,7 @@ module.exports = {
   motor: {
     tick, tratarEntrada, tratarEcoHumano,
     lerConfigIA, proximoIntervaloMs,
+    variantesTelefoneBr, registrarVeredito,
     ...canalStatus,
   },
 };

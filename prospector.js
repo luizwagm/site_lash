@@ -69,16 +69,50 @@ const logSilencioso = {
 
 /* O canal aponta SEMPRE para o socket atual — sobrevive a reconexões. */
 let sock = null;
+
+/* O NONO DÍGITO: colar "@s.whatsapp.net" no número SEM conferir se a conta
+   existe é o furo que fazia o painel dizer "3/3 enviados" com um só chegando —
+   o servidor aceita o JID errado, devolve id, e não entrega nada. Aqui o
+   número é confirmado pelo onWhatsApp() nas DUAS variantes (com e sem o 9) e
+   o envio vai para o JID que o servidor confirmar. Sem conta em nenhuma,
+   falha EXPLÍCITA e permanente, em vez de fingir sucesso. */
+const jidCache = new Map();   // e164 -> jid confirmado (morre com a conexão)
+async function resolverJid(para) {
+  if (jidCache.has(para)) return jidCache.get(para);
+  const variantes = motor.variantesTelefoneBr(para);
+  let resposta;
+  try {
+    resposta = await Promise.race([
+      sock.onWhatsApp(...variantes),
+      /* onWhatsApp pode NÃO responder; sem teto, o laço de envio congela. E
+         timeout NÃO é "sem conta" — tratar como tal aposentaria o lead para
+         sempre por uma oscilação de rede. */
+      new Promise((_, rej) => setTimeout(() => rej(new Error("verificação do número expirou")), 60_000)),
+    ]);
+  } catch (e) {
+    throw new Error(`não deu para verificar o número (${e.message})`);   // transitório → backoff
+  }
+  const conta = (resposta || []).find((r) => r && r.exists);
+  if (!conta) {
+    const erro = new Error("número sem conta de WhatsApp");
+    erro.codigo = "SEM_CONTA_WHATSAPP";   // permanente → o motor cancela com motivo
+    throw erro;
+  }
+  jidCache.set(para, conta.jid);
+  return conta.jid;
+}
+
 const canalWa = {
   name: "whatsapp",
   isReady: () => !!sock && conectado,
   async send(para, texto) {
     if (!canalWa.isReady()) throw new Error("WhatsApp desconectado");
-    const enviada = await sock.sendMessage(`${para}@s.whatsapp.net`, { text: texto });
+    const jid = await resolverJid(para);
+    const enviada = await sock.sendMessage(jid, { text: texto });
     const id = enviada?.key?.id || null;
     if (id) nossas.add(id);
     if (nossas.size > 5000) { const primeiro = nossas.values().next().value; nossas.delete(primeiro); }
-    return { externalId: id };
+    return { externalId: id, deliveredTo: jid.split("@")[0] };
   },
 };
 let conectado = false;
@@ -130,6 +164,7 @@ async function conectar() {
     }
     if (u.connection === "close") {
       conectado = false;
+      jidCache.clear();   // JID confirmado vale para A conexão, não para sempre
       const codigo = u.lastDisconnect?.error?.output?.statusCode;
       if (codigo === DisconnectReason.loggedOut) {
         /* Credencial morta: reiniciar em loop nunca geraria QR novo. Apaga a
@@ -142,6 +177,30 @@ async function conectar() {
       motor.publicarDesconectado(String(u.lastDisconnect?.error?.message || "conexão caiu"));
       console.error("  ✖ conexão caiu — reconectando em 5s");
       setTimeout(() => { if (!parando) conectar().catch((e) => console.error("  ✖ reconexão:", e.message)); }, 5000);
+    }
+  });
+
+  /* O VEREDITO DO SERVIDOR. sendMessage() resolve quando o pacote foi escrito
+     no socket — não quando o WhatsApp aceitou. Mensagem recusada (ex.: 463,
+     conta restrita para iniciar conversa) ficaria como "enviada" para sempre.
+     Aqui cada atualização de status vira registro na mensagem. */
+  s.ev.on("messages.update", (updates) => {
+    for (const u of updates || []) {
+      const id = u.key?.id;
+      if (!id) continue;
+      const st = u.update?.status;
+      let veredito = null;
+      if (st === 2) veredito = "SERVIDOR";
+      else if (st === 3) veredito = "ENTREGUE";
+      else if (st === 4 || st === 5) veredito = "LIDA";
+      else if (st === 0 || u.update?.error) {
+        const codigo = u.update?.error?.code || u.update?.error?.output?.statusCode || "";
+        veredito = ("ERRO " + codigo).trim();
+      }
+      if (veredito) {
+        try { motor.registrarVeredito(id, veredito); }
+        catch (e) { console.error("  ✖ veredito:", e.message); }
+      }
     }
   });
 
