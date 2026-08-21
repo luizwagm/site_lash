@@ -137,6 +137,23 @@ const nossas = new Set();
    conversas novas. Perguntar é melhor que adivinhar pelo erro: vem a DATA em
    que a punição termina, e é ela que o motor usa para voltar sozinho.
    ========================================================================== */
+/* O tipo vem em maiúsculas do servidor e nem todos estão no enum do Baileys
+   (RESTRICT_ALL_COMPANIONS é um deles). Traduzir importa porque a conduta
+   muda: punição de COMPANION atinge os dispositivos vinculados — o celular
+   principal costuma seguir normal —, enquanto BIZ_QUALITY é reclamação de
+   quem recebeu, e aí o problema é a abordagem, não o meio. */
+const MOTIVO_RESTRICAO = {
+  RESTRICT_ALL_COMPANIONS: "atinge os dispositivos vinculados (WhatsApp Web e este bot); o celular principal costuma continuar normal",
+  WEB_COMPANION_ONLY: "atinge só o WhatsApp Web / dispositivos vinculados",
+  BIZ_QUALITY: "qualidade da conta: gente marcou as mensagens como spam ou bloqueou",
+};
+const traduzirRestricao = (tipo) => {
+  const t = String(tipo || "").toUpperCase();
+  if (MOTIVO_RESTRICAO[t]) return MOTIVO_RESTRICAO[t];
+  if (t.startsWith("BIZ_COMMERCE_VIOLATION")) return "conteúdo comercial proibido nas regras do WhatsApp";
+  return t ? `tipo informado pelo WhatsApp: ${t}` : "sem detalhe do WhatsApp";
+};
+
 async function conferirRestricao(textoDaRecusa) {
   if (!sock) return;
   let ate = null, motivo = textoDaRecusa || null, cota = null;
@@ -144,7 +161,7 @@ async function conferirRestricao(textoDaRecusa) {
     const r = await sock.fetchAccountReachoutTimelock();
     if (r?.isActive) {
       ate = r.timeEnforcementEnds ? new Date(r.timeEnforcementEnds).toISOString() : null;
-      motivo = motivo || `conta restrita para iniciar conversas novas (${r.enforcementType || "padrão"})`;
+      motivo = traduzirRestricao(r.enforcementType);
     } else if (!textoDaRecusa) {
       motivo = null;   // consulta limpa e sem recusa recente: nada a registrar
     }

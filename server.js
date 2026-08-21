@@ -29,7 +29,7 @@ const PORT = Number(process.env.PORT) || 5180;   // PORT por env permite subir c
    REGRA: feature nova sobe a 2ª casa (1.3.0, 1.4.0… pode passar de 10);
    correção de bug sobe a 3ª (1.4.1, 1.4.2…, também sem teto).
    A 1ª casa não muda. */
-const APP_VERSION = "1.12.0";
+const APP_VERSION = "1.12.1";
 const UPLOAD_DIR = path.join(ROOT, "assets", "img", "uploads");
 fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });

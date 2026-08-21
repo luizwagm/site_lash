@@ -831,10 +831,10 @@ async function carregarDiag() {
       <b style="color:var(--amber)">O WhatsApp restringiu esta conta para iniciar conversas novas.</b>
       <p style="margin:.4rem 0 0;font-size:.86rem;color:var(--muted)">
         As mensagens de <b>primeiro contato</b> estão pausadas até <b>${quando(d.restricao.ate)}</b> — a fila fica intacta e
-        o envio volta sozinho. <b>Responder quem já escreveu e os follow-ups continuam funcionando</b> (o WhatsApp bloqueia
-        só a conversa nova). O que costuma causar: muitos primeiros contatos com desconhecidos em pouco tempo, ou pessoas
-        marcando a conta como spam. Ao voltar, vale reduzir o teto diário e aumentar o intervalo entre envios.
-        ${d.restricao.motivo ? `<br><span class="hint">${esc(d.restricao.motivo)}</span>` : ""}
+        o envio volta sozinho, sem perder ninguém. <b>Responder quem já escreveu e os follow-ups continuam funcionando</b>
+        (o WhatsApp bloqueia só a conversa nova). O que costuma causar: muitos primeiros contatos com desconhecidos em
+        pouco tempo, ou pessoas marcando a conta como spam. Ao voltar, vale reduzir o teto diário e aumentar o intervalo
+        entre envios.${d.restricao.motivo ? `<br><br><b>Detalhe:</b> ${esc(d.restricao.motivo)}` : ""}
       </p></div>`;
   }
   if (d.cota && (d.cota.quota != null || d.cota.usage != null)) {
