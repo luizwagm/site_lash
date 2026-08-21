@@ -1,6 +1,6 @@
 {
   "name": "la-software-house",
-  "version": "1.11.0",
+  "version": "1.11.1",
   "private": true,
   "description": "Site, gerenciador de conteúdo e gestão da agência (leads/prospecção) da LA Software House (luizaugust.me).",
   "main": "server.js",

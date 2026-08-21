@@ -26,7 +26,7 @@ const crypto = require("node:crypto");
 const { abrirBanco } = require("./db");
 
 const ROOT = __dirname;
-const SISTEMA_VERSION = "1.4.0";
+const SISTEMA_VERSION = "1.4.1";
 const APP_VERSION_SITE = require("./package.json").version;   // a versão do SITE, mostrada no menu
 const APP_DIR = path.join(ROOT, "restrito");
 

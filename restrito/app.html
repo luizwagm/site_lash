@@ -782,9 +782,13 @@ function alternarMenu(id) {
 }
 document.addEventListener("click", (e) => { if (!e.target.closest(".menu-sup")) fecharMenus(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharMenus(); });
-document.querySelectorAll(".aba").forEach((b) =>
+/* SÓ as abas da Prospecção (data-a). As abas da agenda (data-f) e as de
+   período dos Acessos (data-dias) têm os próprios onclick — um seletor
+   genérico ".aba" aqui pegava todas, tentava mostrar "#a-undefined" e
+   escondia os quatro sub-painéis: a tela sumia ao clicar. */
+document.querySelectorAll(".aba[data-a]").forEach((b) =>
   b.addEventListener("click", () => {
-    document.querySelectorAll(".aba").forEach((x) => x.classList.remove("on"));
+    document.querySelectorAll(".aba[data-a]").forEach((x) => x.classList.remove("on"));
     ["conversas", "agendar", "conexao", "config"].forEach((a) => { $("#a-" + a).hidden = a !== b.dataset.a; });
     b.classList.add("on");
     if (b.dataset.a === "agendar") carregarElegiveis();
