@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="dark">
+  <title>Gestão — LA Software House</title>
+  <link rel="icon" href="/assets/img/favicon-pilares.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <style>
+    :root{--bg:#08080c;--bg2:#0d0d14;--surface:#14141f;--surface2:#1b1b28;--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.16);
+      --text:#f3f4fb;--muted:#9a9db1;--dim:#656879;--violet:#7c5cff;--cyan:#24e3d6;--red:#ff5c7a;--green:#3ddc97;--amber:#ffc95c;
+      --grad:linear-gradient(120deg,#7c5cff,#24e3d6);--r:12px;--mono:'JetBrains Mono',monospace}
+    *{box-sizing:border-box;margin:0}
+    [hidden]{display:none !important}
+    body{font:15px/1.6 Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    h1,h2,h3{font-family:'Space Grotesk',sans-serif;letter-spacing:-.02em}
+    button{font:inherit;cursor:pointer;color:inherit}
+    input,textarea,select{width:100%;padding:.6rem .8rem;font:inherit;color:var(--text);background:var(--bg2);
+      border:1px solid var(--line2);border-radius:8px}
+    input:focus,textarea:focus,select:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(124,92,255,.25)}
+    textarea{resize:vertical;min-height:80px}
+    label{font-size:.8rem;font-weight:600;color:var(--muted);display:block;margin:.8rem 0 .3rem}
+    input[type=checkbox]{width:auto;accent-color:var(--violet)}
+    .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.1rem;border-radius:999px;border:1px solid transparent;font-weight:600}
+    .btn-grad{background:var(--grad);color:#08080c}
+    .btn-ghost{background:rgba(255,255,255,.05);border-color:var(--line2)}
+    .btn-danger{background:rgba(255,92,122,.12);color:var(--red);border-color:rgba(255,92,122,.3)}
+    .btn-sm{padding:.35rem .7rem;font-size:.8rem}
+    .btn[disabled]{opacity:.45;cursor:not-allowed}
+    .app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+    aside{background:var(--bg2);border-right:1px solid var(--line);padding:1.2rem;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+    aside img{height:44px;width:auto;margin-bottom:1.4rem}
+    .navbtn{display:block;width:100%;text-align:left;padding:.6rem .8rem;border-radius:8px;border:0;background:none;color:var(--muted);font-weight:500;margin-bottom:.15rem}
+    .navbtn:hover{background:rgba(255,255,255,.05);color:var(--text)}
+    .navbtn.on{background:rgba(124,92,255,.15);color:var(--text)}
+    main{padding:2rem 2.4rem;max-width:1280px}
+    .panel{display:none}.panel.on{display:block}
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1.2rem;margin-bottom:1rem}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:0 1rem}
+    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 1rem}
+    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.6rem;gap:1rem;flex-wrap:wrap}
+    .hint{font-size:.75rem;color:var(--dim);font-family:var(--mono)}
+    .toast{position:fixed;bottom:1.2rem;left:50%;transform:translate(-50%,150%);background:var(--surface2);
+      border:1px solid var(--line2);padding:.8rem 1.3rem;border-radius:999px;font-weight:600;transition:transform .3s;z-index:99}
+    .toast.on{transform:translate(-50%,0)}
+    .toast.err{border-color:var(--red);color:var(--red)}
+    #login{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:50}
+    #login .card{width:min(380px,90vw);text-align:center;padding:2rem}
+    .mt{margin-top:1rem}.mb{margin-bottom:1rem}.right{text-align:right}
+    .pill{font-family:var(--mono);font-size:.7rem;padding:.15rem .5rem;border:1px solid var(--line2);border-radius:999px;color:var(--dim)}
+    .pill.ok{color:var(--green);border-color:rgba(61,220,151,.4)}
+    .pill.err{color:var(--red);border-color:rgba(255,92,122,.4)}
+    .pill.warn{color:var(--amber);border-color:rgba(255,201,92,.4)}
+    /* tabela de leads */
+    table{width:100%;border-collapse:collapse;font-size:.88rem}
+    th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);text-align:left;padding:.5rem .6rem;border-bottom:1px solid var(--line)}
+    td{padding:.55rem .6rem;border-bottom:1px solid var(--line);vertical-align:middle}
+    tr.clicavel{cursor:pointer}
+    tr.clicavel:hover td{background:rgba(255,255,255,.03)}
+    /* kanban */
+    .kanban{display:flex;gap:.8rem;overflow-x:auto;padding-bottom:1rem;align-items:flex-start}
+    .coluna{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);min-width:230px;width:230px;flex:none;padding:.7rem}
+    .coluna h3{font-size:.8rem;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:.6rem;padding:0 .2rem}
+    .coluna.sobre{border-color:var(--violet);background:rgba(124,92,255,.08)}
+    .cartao{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:.6rem .7rem;margin-bottom:.5rem;cursor:grab;font-size:.84rem}
+    .cartao:active{cursor:grabbing}
+    .cartao .nome{font-weight:600}
+    .cartao .meta{color:var(--dim);font-size:.74rem;margin-top:.15rem}
+    .selo{display:inline-block;font-size:.66rem;font-family:var(--mono);padding:.05rem .4rem;border-radius:999px;margin:.2rem .2rem 0 0;border:1px solid var(--line2);color:var(--muted)}
+    .selo.wa{color:var(--green);border-color:rgba(61,220,151,.4)}
+    .selo.semsite{color:var(--amber);border-color:rgba(255,201,92,.4)}
+    /* modal */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:grid;place-items:center;z-index:40;padding:1.5rem}
+    .modal>.card{width:min(760px,96vw);max-height:92vh;overflow:auto;margin:0}
+    /* conversa */
+    .fio{display:flex;flex-direction:column;gap:.45rem;padding:.6rem 0}
+    .balao{max-width:78%;padding:.5rem .8rem;border-radius:12px;font-size:.87rem;white-space:pre-wrap;word-break:break-word}
+    .balao.entrada{align-self:flex-start;background:var(--surface2);border:1px solid var(--line)}
+    .balao.saida{align-self:flex-end;background:rgba(124,92,255,.2);border:1px solid rgba(124,92,255,.35)}
+    .balao .quando{display:block;font-size:.64rem;color:var(--dim);font-family:var(--mono);margin-top:.25rem}
+    /* diagnóstico */
+    .diag{display:flex;gap:.6rem;flex-wrap:wrap}
+    .stat{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:.6rem .9rem;min-width:110px}
+    .stat b{display:block;font-size:1.3rem;font-family:'Space Grotesk',sans-serif}
+    .stat span{font-size:.7rem;color:var(--dim)}
+    .abas{display:flex;gap:.4rem;margin-bottom:1rem;flex-wrap:wrap}
+    .aba{padding:.4rem .9rem;border-radius:999px;border:1px solid var(--line2);background:none;color:var(--muted);font-size:.85rem;font-weight:600}
+    .aba.on{background:rgba(124,92,255,.15);color:var(--text);border-color:var(--violet)}
+    .filtros{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem}
+    .filtros input,.filtros select{width:auto;min-width:110px;padding:.45rem .7rem;font-size:.85rem}
+    .check{display:inline-flex;align-items:center;gap:.35rem;font-size:.82rem;color:var(--muted);white-space:nowrap}
+    .qr-box{display:grid;place-items:center;background:#fff;border-radius:12px;padding:1rem;width:min(320px,100%)}
+    .qr-box svg{width:100%;height:auto}
+    @media(max-width:860px){.app{grid-template-columns:1fr}aside{position:static;height:auto;flex-direction:row;align-items:center;flex-wrap:wrap;gap:.3rem}aside img{margin:0 1rem 0 0}main{padding:1.2rem}.row,.row3{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+
+<div id="login" hidden>
+  <div class="card">
+    <img src="/assets/img/favicon-pilares.svg" width="64" height="64" alt="LA" style="margin:0 auto 1rem">
+    <h2 style="margin-bottom:.4rem">Gestão LA</h2>
+    <p style="color:var(--muted);font-size:.85rem" class="mb">Leads, funil e prospecção da agência.</p>
+    <input type="email" id="lg_email" placeholder="E-mail" autocomplete="username">
+    <input type="password" id="lg_senha" placeholder="Senha" autocomplete="current-password" class="mt" style="margin-top:.6rem">
+    <button class="btn btn-grad mt" style="width:100%;justify-content:center" onclick="entrar()">Entrar</button>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
+  <aside>
+    <img src="/assets/img/logo-pilares.svg" alt="LA Software House">
+    <button class="navbtn on" data-p="painel">◆ Painel</button>
+    <button class="navbtn" data-p="leads">Leads</button>
+    <button class="navbtn" data-p="funil">Funil</button>
+    <button class="navbtn" data-p="prospeccao">Prospecção</button>
+    <button class="navbtn" data-p="senha">Senha</button>
+    <div style="margin-top:auto">
+      <span class="pill">v{{VERSAO}}</span>
+      <a class="navbtn" href="/" target="_blank" style="text-decoration:none;display:block;margin-top:.5rem">↗ Ver o site</a>
+      <a class="navbtn" href="/admin/" target="_blank" style="text-decoration:none;display:block">↗ Conteúdo do site</a>
+      <button class="navbtn" onclick="sair()">Sair</button>
+    </div>
+  </aside>
+
+  <main>
+    <!-- PAINEL -->
+    <section class="panel on" id="p-painel">
+      <div class="topbar"><h1>Painel</h1><span class="pill" id="ola"></span></div>
+      <div class="card">
+        <h3 class="mb">Prospecção agora</h3>
+        <div class="diag" id="diag-stats"></div>
+        <p class="hint mt" id="diag-impedimentos"></p>
+      </div>
+      <div class="card">
+        <h3 class="mb">Funil</h3>
+        <div class="diag" id="painel-funil"></div>
+      </div>
+    </section>
+
+    <!-- LEADS -->
+    <section class="panel" id="p-leads">
+      <div class="topbar"><h1>Leads</h1>
+        <div>
+          <button class="btn btn-ghost" onclick="alternar('captar-box')">🔎 Captar no Google</button>
+          <button class="btn btn-ghost" onclick="alternar('novo-lead-box')">+ Lead manual</button>
+        </div>
+      </div>
+
+      <div class="card" id="captar-box" hidden>
+        <h3 class="mb">Captar leads no Google</h3>
+        <p class="hint mb">Busca empresas de QUALQUER segmento no Google Maps e traz nome, telefone, WhatsApp, site e avaliações. Quem já está na base não entra de novo.</p>
+        <div class="row3">
+          <div><label>Segmento / nicho</label><input id="cp_nicho" placeholder="ex.: clínica odontológica, academia, restaurante"></div>
+          <div><label>Cidade</label><input id="cp_cidade" placeholder="Caruaru"></div>
+          <div><label>UF</label><input id="cp_uf" placeholder="PE" maxlength="2"></div>
+        </div>
+        <div class="right mt"><button class="btn btn-grad" id="cp_btn" onclick="captar()">Buscar e importar</button></div>
+        <p class="hint mt" id="cp_log"></p>
+      </div>
+
+      <div class="card" id="novo-lead-box" hidden>
+        <h3 class="mb">Novo lead manual</h3>
+        <div class="row3">
+          <div><label>Nome da empresa</label><input id="nl_nome"></div>
+          <div><label>Cidade</label><input id="nl_cidade"></div>
+          <div><label>UF</label><input id="nl_uf" maxlength="2"></div>
+        </div>
+        <div class="row3">
+          <div><label>WhatsApp <span class="hint">DDD + número</span></label><input id="nl_whatsapp" placeholder="81 99999-9999"></div>
+          <div><label>Segmento</label><input id="nl_segmento"></div>
+          <div><label>Site (se tiver)</label><input id="nl_site"></div>
+        </div>
+        <label>Notas</label><textarea id="nl_notas" rows="2"></textarea>
+        <div class="right mt"><button class="btn btn-grad" onclick="criarLead()">Salvar lead</button></div>
+      </div>
+
+      <div class="filtros">
+        <input id="f_q" placeholder="Buscar por nome…" oninput="filtroDigitado()">
+        <input id="f_cidade" placeholder="Cidade" oninput="filtroDigitado()">
+        <select id="f_etapa" onchange="carregarLeads()"><option value="">Todas as etapas</option></select>
+        <input id="f_segmento" placeholder="Segmento" oninput="filtroDigitado()">
+        <label class="check"><input type="checkbox" id="f_whatsapp" onchange="carregarLeads()"> só com WhatsApp</label>
+        <label class="check"><input type="checkbox" id="f_semsite" onchange="carregarLeads()"> sem site próprio</label>
+        <span class="hint" id="leads-total"></span>
+      </div>
+      <div class="card" style="padding:.4rem .8rem;overflow-x:auto">
+        <table>
+          <thead><tr><th>Empresa</th><th>Cidade</th><th>Segmento</th><th>Contato</th><th>Aval.</th><th>Etapa</th></tr></thead>
+          <tbody id="leads-corpo"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- FUNIL -->
+    <section class="panel" id="p-funil">
+      <div class="topbar"><h1>Funil</h1><span class="hint">arraste o cartão para mudar de etapa · clique para abrir</span></div>
+      <div class="kanban" id="kanban"></div>
+    </section>
+
+    <!-- PROSPECÇÃO -->
+    <section class="panel" id="p-prospeccao">
+      <div class="topbar"><h1>Prospecção automática</h1>
+        <label class="check" style="font-size:.95rem"><input type="checkbox" id="pr_ligada" onchange="ligarDesligar()"> automação ligada</label>
+      </div>
+      <div class="card">
+        <div class="diag" id="pr-diag"></div>
+        <p class="hint mt" id="pr-impedimentos"></p>
+      </div>
+      <div class="abas">
+        <button class="aba on" data-a="conversas">Conversas</button>
+        <button class="aba" data-a="agendar">Agendar</button>
+        <button class="aba" data-a="conexao">Conexão</button>
+        <button class="aba" data-a="config">Config</button>
+      </div>
+
+      <div id="a-conversas">
+        <div class="filtros">
+          <select id="cv_filtro" onchange="carregarConversas()">
+            <option value="">Todos os status</option>
+            <option>AGENDADO</option><option>ENVIADO</option><option>RESPONDEU</option><option>EM_NEGOCIACAO</option>
+            <option>ASSUMIDO_HUMANO</option><option>SEM_RESPOSTA</option><option>ENCERRADO</option><option>FALHOU</option>
+          </select>
+        </div>
+        <div id="conversas-lista"></div>
+      </div>
+
+      <div id="a-agendar" hidden>
+        <div class="card">
+          <h3 class="mb">Agendar lote de primeiro contato</h3>
+          <p class="hint mb">Só entram empresas com celular, sem opt-out, sem tarefa pendente e sem conversa em andamento. O motor envia UMA por vez, com intervalo humano, dentro da janela.</p>
+          <div class="row">
+            <div><label>Quando começar</label><input type="datetime-local" id="ag_quando"></div>
+            <div><label>Nota do lote (opcional)</label><input id="ag_nota" placeholder="ex.: clínicas de Caruaru"></div>
+          </div>
+          <div class="right mt">
+            <span class="hint" id="ag_resumo" style="margin-right:.8rem"></span>
+            <button class="btn btn-grad" onclick="agendarLote()">Agendar selecionadas</button>
+          </div>
+        </div>
+        <div class="card" style="padding:.4rem .8rem;overflow-x:auto">
+          <table>
+            <thead><tr><th><input type="checkbox" id="ag_todas" onchange="marcarTodas()"></th><th>Empresa</th><th>Cidade</th><th>Segmento</th><th>Situação</th></tr></thead>
+            <tbody id="elegiveis-corpo"></tbody>
+          </table>
+        </div>
+        <div class="card"><h3 class="mb">Lotes recentes</h3><div id="lotes-lista" class="hint"></div></div>
+      </div>
+
+      <div id="a-conexao" hidden>
+        <div class="card">
+          <h3 class="mb">Conexão com o WhatsApp</h3>
+          <p id="cx_estado" class="mb"></p>
+          <div id="cx_qr"></div>
+          <p class="hint mt">O worker (<code>node prospector.js</code>) precisa estar rodando. O QR expira em ~20s e renasce sozinho — a tela atualiza a cada 5s.</p>
+          <div class="mt"><button class="btn btn-danger" onclick="desconectarWa()">Desconectar este número</button></div>
+        </div>
+      </div>
+
+      <div id="a-config" hidden>
+        <div class="card">
+          <h3 class="mb">Ritmo e janela</h3>
+          <div class="row3">
+            <div><label>Teto diário de envios</label><input type="number" id="cf_teto_diario" min="1" max="500"></div>
+            <div><label>Intervalo mínimo (s)</label><input type="number" id="cf_gap_min_seg" min="5"></div>
+            <div><label>Intervalo máximo (s)</label><input type="number" id="cf_gap_max_seg" min="5"></div>
+          </div>
+          <div class="row3">
+            <div><label>Janela: início (h)</label><input type="number" id="cf_janela_inicio" min="0" max="23"></div>
+            <div><label>Janela: fim (h)</label><input type="number" id="cf_janela_fim" min="1" max="24"></div>
+            <div><label style="margin-bottom:.55rem">&nbsp;</label><label class="check"><input type="checkbox" id="cf_fim_de_semana"> enviar no fim de semana</label></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 class="mb">A voz da IA</h3>
+          <label>Tom (quem ela é, como fala)</label><textarea id="cf_ia_tom" rows="8"></textarea>
+          <label>Roteiro (o que fazer em cada situação)</label><textarea id="cf_ia_roteiro" rows="10"></textarea>
+          <div class="row">
+            <div><label>Modelo</label><input id="cf_ia_modelo" placeholder="claude-sonnet-5"></div>
+            <div><label>Endereço do site (links que a IA pode mandar)</label><input id="cf_base_url"></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 class="mb">Chaves de API</h3>
+          <p class="hint mb">A chave gravada nunca volta para esta tela. Campo vazio = manter a atual.</p>
+          <label>Anthropic (IA) — <span id="cf_st_anthropic" class="hint"></span></label>
+          <input type="password" id="cf_anthropic_api_key" autocomplete="off" placeholder="sk-ant-…">
+          <label>Google Places (captação) — <span id="cf_st_places" class="hint"></span></label>
+          <input type="password" id="cf_google_places_api_key" autocomplete="off" placeholder="AIza…">
+        </div>
+        <div class="right"><button class="btn btn-grad" onclick="salvarConfig()">Salvar configuração</button></div>
+      </div>
+    </section>
+
+    <!-- SENHA -->
+    <section class="panel" id="p-senha">
+      <div class="topbar"><h1>Trocar senha</h1></div>
+      <div class="card" style="max-width:420px">
+        <label>Senha atual</label><input type="password" id="sn_atual" autocomplete="current-password">
+        <label>Nova senha <span class="hint">mínimo 8 caracteres</span></label>
+        <input type="password" id="sn_nova" autocomplete="new-password" minlength="8">
+        <button class="btn btn-grad mt" onclick="trocarSenha()">Salvar nova senha</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- MODAL: detalhe do lead -->
+<div class="modal" id="modal-lead" hidden>
+  <div class="card">
+    <div class="topbar" style="margin-bottom:.6rem"><h2 id="ld_titulo"></h2>
+      <button class="btn btn-ghost btn-sm" onclick="fecharModal('modal-lead')">Fechar ✕</button>
+    </div>
+    <div class="row3">
+      <div><label>Nome</label><input id="ld_nome"></div>
+      <div><label>Cidade</label><input id="ld_cidade"></div>
+      <div><label>UF</label><input id="ld_uf" maxlength="2"></div>
+    </div>
+    <div class="row3">
+      <div><label>WhatsApp</label><input id="ld_whatsapp"></div>
+      <div><label>Telefone</label><input id="ld_telefone"></div>
+      <div><label>Responsável</label><input id="ld_responsavel"></div>
+    </div>
+    <div class="row3">
+      <div><label>Segmento</label><input id="ld_segmento"></div>
+      <div><label>Site</label><input id="ld_site"></div>
+      <div><label>Etapa</label><select id="ld_etapa"></select></div>
+    </div>
+    <label>Notas</label><textarea id="ld_notas" rows="3"></textarea>
+    <label class="check mt"><input type="checkbox" id="ld_optout"> opt-out (nunca mais abordar)</label>
+    <div class="right mt">
+      <button class="btn btn-danger btn-sm" onclick="excluirLead()">Excluir</button>
+      <button class="btn btn-grad" onclick="salvarLead()">Salvar</button>
+    </div>
+
+    <div class="card" style="margin-top:1.2rem;background:var(--bg2)">
+      <h3 class="mb">Primeiro contato manual</h3>
+      <p class="hint mb">A IA escreve, você revisa e envia pelo SEU WhatsApp. O envio fica registrado no histórico.</p>
+      <textarea id="ld_msg" rows="5" placeholder="Clique em “Gerar com IA” ou escreva a mensagem…"></textarea>
+      <div class="right mt">
+        <button class="btn btn-ghost btn-sm" id="ld_gerar" onclick="gerarMensagem()">✦ Gerar com IA</button>
+        <button class="btn btn-grad btn-sm" onclick="enviarWa()">Abrir no WhatsApp e registrar</button>
+      </div>
+    </div>
+
+    <div class="card" style="background:var(--bg2)">
+      <h3 class="mb">Registrar contato</h3>
+      <div class="row">
+        <div><label>Canal</label><select id="rc_canal"><option value="whatsapp">WhatsApp</option><option value="email">E-mail</option><option value="telefone">Telefone</option><option value="reuniao">Reunião</option><option value="outro">Outro</option></select></div>
+        <div><label>&nbsp;</label><label class="check"><input type="checkbox" id="rc_mover" checked> mover para “Mensagem enviada” se for o 1º</label></div>
+      </div>
+      <label>O que foi conversado</label><textarea id="rc_msg" rows="2"></textarea>
+      <div class="right mt"><button class="btn btn-ghost btn-sm" onclick="registrarContato()">Registrar</button></div>
+    </div>
+
+    <h3 class="mb mt">Histórico de contato</h3>
+    <div class="fio" id="ld_timeline"></div>
+  </div>
+</div>
+
+<!-- MODAL: fio da conversa -->
+<div class="modal" id="modal-conversa" hidden>
+  <div class="card">
+    <div class="topbar" style="margin-bottom:.6rem"><h2 id="cv_titulo"></h2>
+      <button class="btn btn-ghost btn-sm" onclick="fecharModal('modal-conversa')">Fechar ✕</button>
+    </div>
+    <p class="hint mb" id="cv_sub"></p>
+    <div class="mb">
+      <button class="btn btn-ghost btn-sm" onclick="acaoConversa('assumir')">🙋 Assumir (IA sai)</button>
+      <button class="btn btn-ghost btn-sm" onclick="acaoConversa('ligar_ia')">⚡ Ligar IA</button>
+      <button class="btn btn-ghost btn-sm" onclick="acaoConversa('desligar_ia')">✋ Desligar IA</button>
+    </div>
+    <div class="fio" id="cv_fio"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const API = "/restrito/api/";
+let EU = null, ETAPAS = [], LEADS = [], leadAberto = null, conversaAberta = null;
+
+/* ------------------------------- infra ---------------------------------- */
+async function api(rota, method = "GET", body) {
+  const r = await fetch(API + rota, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+let toastT;
+function toast(msg, err = false) {
+  const t = $("#toast"); t.textContent = msg; t.classList.toggle("err", err); t.classList.add("on");
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 3200);
+}
+const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+const quando = (iso) => iso ? new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+function alternar(id) { const el = document.getElementById(id); el.hidden = !el.hidden; }
+function fecharModal(id) { document.getElementById(id).hidden = true; }
+
+/* ------------------------------- auth ----------------------------------- */
+async function boot() {
+  try { EU = await api("eu"); mostrarApp(); } catch { $("#login").hidden = false; }
+}
+async function entrar() {
+  try {
+    const r = await api("entrar", "POST", { email: $("#lg_email").value, senha: $("#lg_senha").value });
+    EU = r; $("#login").hidden = true; mostrarApp();
+  } catch (e) { toast(e.message, true); }
+}
+async function sair() { await api("sair", "POST"); location.reload(); }
+$("#lg_senha").addEventListener("keydown", (e) => e.key === "Enter" && entrar());
+
+async function mostrarApp() {
+  $("#app").hidden = false;
+  $("#ola").textContent = EU.nome || EU.email || "";
+  ETAPAS = (await api("funil")).etapas;
+  const selE = $("#f_etapa"), selL = $("#ld_etapa");
+  for (const [v, rotulo] of ETAPAS) {
+    selE.insertAdjacentHTML("beforeend", `<option value="${v}">${rotulo}</option>`);
+    selL.insertAdjacentHTML("beforeend", `<option value="${v}">${rotulo}</option>`);
+  }
+  await Promise.all([carregarPainel(), carregarLeads(), carregarFunil(), carregarDiag(), carregarConfig(), carregarConversas()]);
+  setInterval(() => { carregarDiag().catch(() => {}); if (!$("#a-conexao").hidden) carregarCanal().catch(() => {}); }, 5000);
+}
+
+/* -------------------------------- nav ----------------------------------- */
+document.querySelectorAll(".navbtn[data-p]").forEach((b) =>
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".navbtn[data-p]").forEach((x) => x.classList.remove("on"));
+    document.querySelectorAll(".panel").forEach((x) => x.classList.remove("on"));
+    b.classList.add("on");
+    $("#p-" + b.dataset.p).classList.add("on");
+    if (b.dataset.p === "funil") carregarFunil();
+    if (b.dataset.p === "painel") carregarPainel();
+  })
+);
+document.querySelectorAll(".aba").forEach((b) =>
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".aba").forEach((x) => x.classList.remove("on"));
+    ["conversas", "agendar", "conexao", "config"].forEach((a) => { $("#a-" + a).hidden = a !== b.dataset.a; });
+    b.classList.add("on");
+    if (b.dataset.a === "agendar") carregarElegiveis();
+    if (b.dataset.a === "conexao") carregarCanal();
+    if (b.dataset.a === "conversas") carregarConversas();
+  })
+);
+
+/* ------------------------------- painel ---------------------------------- */
+const NOMES_IMPEDIMENTO = {
+  automacao_desligada: "automação desligada", worker_offline: "worker do WhatsApp fora do ar",
+  whatsapp_desconectado: "WhatsApp desconectado (escaneie o QR)", fora_da_janela: "fora da janela de horário",
+  teto_diario: "teto diário atingido",
+};
+async function carregarPainel() {
+  const funil = await api("funil");
+  const porEtapa = {};
+  for (const l of funil.linhas) porEtapa[l.etapa] = (porEtapa[l.etapa] || 0) + 1;
+  $("#painel-funil").innerHTML = funil.etapas.map(([v, rotulo]) =>
+    `<div class="stat"><b>${porEtapa[v] || 0}</b><span>${esc(rotulo)}</span></div>`).join("");
+}
+async function carregarDiag() {
+  const d = await api("prospeccao/diagnostico");
+  const stats = `
+    <div class="stat"><b>${d.enviadasHoje}/${d.tetoDiario}</b><span>enviadas hoje</span></div>
+    <div class="stat"><b>${d.naFila}</b><span>na fila</span></div>
+    <div class="stat"><b>${d.atrasadas}</b><span>vencidas</span></div>
+    <div class="stat"><b>${d.followUpsVencidos}</b><span>follow-ups devidos</span></div>
+    <div class="stat"><b>${d.janela.inicio}–${d.janela.fim}h</b><span>janela (${esc(d.janela.fuso)})</span></div>`;
+  const imp = d.pronto
+    ? `<span class="pill ok">✓ pronta para enviar</span>`
+    : d.impedimentos.map((i) => `<span class="pill err">✕ ${NOMES_IMPEDIMENTO[i] || i}</span>`).join(" ");
+  $("#diag-stats").innerHTML = stats; $("#diag-impedimentos").innerHTML = imp;
+  $("#pr-diag").innerHTML = stats; $("#pr-impedimentos").innerHTML = imp;
+  $("#pr_ligada").checked = !d.impedimentos.includes("automacao_desligada");
+}
+async function ligarDesligar() {
+  const ligar = $("#pr_ligada").checked;
+  if (ligar && !confirm("Ligar a automação? O motor começa a enviar mensagens de verdade pelas tarefas agendadas.")) {
+    $("#pr_ligada").checked = false; return;
+  }
+  try { await api("prospeccao/config", "PUT", { ia_ligada: ligar }); toast(ligar ? "Automação LIGADA" : "Automação desligada"); carregarDiag(); }
+  catch (e) { toast(e.message, true); $("#pr_ligada").checked = !ligar; }
+}
+
+/* ------------------------------- leads ----------------------------------- */
+let filtroT;
+function filtroDigitado() { clearTimeout(filtroT); filtroT = setTimeout(carregarLeads, 350); }
+async function carregarLeads() {
+  const q = new URLSearchParams();
+  if ($("#f_q").value) q.set("q", $("#f_q").value);
+  if ($("#f_cidade").value) q.set("cidade", $("#f_cidade").value);
+  if ($("#f_etapa").value) q.set("etapa", $("#f_etapa").value);
+  if ($("#f_segmento").value) q.set("segmento", $("#f_segmento").value);
+  if ($("#f_whatsapp").checked) q.set("whatsapp", "1");
+  if ($("#f_semsite").checked) q.set("sem_site", "1");
+  q.set("limite", "200");
+  const r = await api("leads?" + q);
+  LEADS = r.linhas;
+  $("#leads-total").textContent = `${r.total} lead(s)`;
+  const rotulo = Object.fromEntries(ETAPAS);
+  $("#leads-corpo").innerHTML = LEADS.map((l) => `
+    <tr class="clicavel" onclick="abrirLead(${l.id})">
+      <td><b>${esc(l.nome)}</b></td>
+      <td>${esc(l.cidade || "")}${l.uf ? "/" + esc(l.uf) : ""}</td>
+      <td>${esc(l.segmento || "")}</td>
+      <td>${l.whatsapp ? '<span class="selo wa">WA</span>' : ""}${!l.site_proprio ? '<span class="selo semsite">sem site</span>' : ""}</td>
+      <td>${l.rating ? `${l.rating}★ (${l.avaliacoes || 0})` : "—"}</td>
+      <td><span class="pill">${esc(rotulo[l.etapa] || l.etapa)}</span></td>
+    </tr>`).join("") || `<tr><td colspan="6" class="hint" style="padding:1rem">Nenhum lead — use “Captar no Google” acima.</td></tr>`;
+}
+async function captar() {
+  const nicho = $("#cp_nicho").value.trim(), cidade = $("#cp_cidade").value.trim(), uf = $("#cp_uf").value.trim();
+  if (!nicho || !cidade || !uf) return toast("Preencha segmento, cidade e UF", true);
+  $("#cp_btn").disabled = true; $("#cp_log").textContent = "Buscando no Google Maps…";
+  try {
+    const r = await api("captar", "POST", { nicho, cidade, uf });
+    $("#cp_log").textContent = `✓ ${r.inseridos} novos de ${r.total} encontrados (já cadastrados: ${r.pulados.jaCadastrado}, fechados: ${r.pulados.fechado})`;
+    toast(`${r.inseridos} leads importados!`);
+    carregarLeads(); carregarPainel();
+  } catch (e) { $("#cp_log").textContent = ""; toast(e.message, true); }
+  $("#cp_btn").disabled = false;
+}
+async function criarLead() {
+  try {
+    await api("leads", "POST", {
+      nome: $("#nl_nome").value, cidade: $("#nl_cidade").value, uf: $("#nl_uf").value,
+      whatsapp: $("#nl_whatsapp").value, segmento: $("#nl_segmento").value,
+      site: $("#nl_site").value, notas: $("#nl_notas").value,
+    });
+    ["nl_nome", "nl_cidade", "nl_uf", "nl_whatsapp", "nl_segmento", "nl_site", "nl_notas"].forEach((i) => $("#" + i).value = "");
+    $("#novo-lead-box").hidden = true;
+    toast("Lead criado!"); carregarLeads(); carregarPainel();
+  } catch (e) { toast(e.message, true); }
+}
+async function abrirLead(id) {
+  const r = await api("leads/" + id);
+  leadAberto = r.lead;
+  $("#ld_titulo").textContent = r.lead.nome;
+  for (const f of ["nome", "cidade", "uf", "whatsapp", "telefone", "responsavel", "segmento", "site", "notas"])
+    $("#ld_" + f).value = r.lead[f] || "";
+  $("#ld_etapa").value = r.lead.etapa;
+  $("#ld_optout").checked = !!r.lead.opt_out;
+  $("#ld_msg").value = "";
+  const eventos = [
+    ...r.registros.map((x) => ({ t: x.criado_em, html: `<div class="balao saida">📌 <b>${esc(x.canal)}</b> — ${esc(x.mensagem)}<span class="quando">${quando(x.criado_em)}</span></div>` })),
+    ...r.mensagens.map((x) => ({ t: x.criado_em, html: `<div class="balao ${x.direcao === "ENTRADA" ? "entrada" : "saida"}">${esc(x.corpo)}<span class="quando">${x.direcao === "SAIDA" ? (x.via_ia ? "IA · " : "nós · ") : "empresa · "}${quando(x.criado_em)}</span></div>` })),
+  ].sort((a, b) => a.t < b.t ? -1 : 1);
+  $("#ld_timeline").innerHTML = eventos.map((e) => e.html).join("") || '<p class="hint">Nenhum contato registrado ainda.</p>';
+  $("#modal-lead").hidden = false;
+}
+async function salvarLead() {
+  try {
+    const b = {};
+    for (const f of ["nome", "cidade", "uf", "whatsapp", "telefone", "responsavel", "segmento", "site", "notas"]) b[f] = $("#ld_" + f).value;
+    b.etapa = $("#ld_etapa").value;
+    b.opt_out = $("#ld_optout").checked;
+    await api("leads/" + leadAberto.id, "PATCH", b);
+    toast("Lead salvo!"); fecharModal("modal-lead"); carregarLeads(); carregarFunil(); carregarPainel();
+  } catch (e) { toast(e.message, true); }
+}
+async function excluirLead() {
+  if (!confirm(`Excluir "${leadAberto.nome}" e todo o histórico?`)) return;
+  try { await api("leads/" + leadAberto.id, "DELETE"); toast("Excluído."); fecharModal("modal-lead"); carregarLeads(); carregarFunil(); }
+  catch (e) { toast(e.message, true); }
+}
+async function gerarMensagem() {
+  $("#ld_gerar").disabled = true; $("#ld_msg").value = "A IA está escrevendo…";
+  try { const r = await api(`leads/${leadAberto.id}/mensagem-ia`, "POST"); $("#ld_msg").value = r.mensagem; }
+  catch (e) { $("#ld_msg").value = ""; toast(e.message, true); }
+  $("#ld_gerar").disabled = false;
+}
+async function enviarWa() {
+  const msg = $("#ld_msg").value.trim();
+  if (!msg) return toast("Escreva ou gere a mensagem primeiro", true);
+  const num = ($("#ld_whatsapp").value || "").replace(/\D/g, "");
+  if (!num) return toast("Este lead não tem WhatsApp", true);
+  try {
+    await api(`leads/${leadAberto.id}/contato`, "POST", { canal: "whatsapp", mensagem: msg, mover: true });
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, "_blank");
+    toast("Registrado — enviando pelo seu WhatsApp"); carregarLeads(); carregarFunil();
+  } catch (e) { toast(e.message, true); }
+}
+async function registrarContato() {
+  try {
+    await api(`leads/${leadAberto.id}/contato`, "POST", { canal: $("#rc_canal").value, mensagem: $("#rc_msg").value, mover: $("#rc_mover").checked });
+    $("#rc_msg").value = "";
+    toast("Contato registrado!"); abrirLead(leadAberto.id); carregarLeads();
+  } catch (e) { toast(e.message, true); }
+}
+
+/* ------------------------------- funil ----------------------------------- */
+async function carregarFunil() {
+  const r = await api("funil");
+  const porEtapa = {};
+  for (const [v] of r.etapas) porEtapa[v] = [];
+  for (const l of r.linhas) (porEtapa[l.etapa] || (porEtapa[l.etapa] = [])).push(l);
+  $("#kanban").innerHTML = r.etapas.map(([v, rotulo]) => `
+    <div class="coluna" data-etapa="${v}" ondragover="event.preventDefault();this.classList.add('sobre')"
+         ondragleave="this.classList.remove('sobre')" ondrop="soltar(event,'${v}')">
+      <h3>${esc(rotulo)} <span>${porEtapa[v].length}</span></h3>
+      ${porEtapa[v].map((l) => `
+        <div class="cartao" draggable="true" ondragstart="arrastar(event,${l.id})" onclick="abrirLead(${l.id})">
+          <div class="nome">${esc(l.nome)}</div>
+          <div class="meta">${esc(l.cidade || "")}${l.uf ? "/" + esc(l.uf) : ""}${l.segmento ? " · " + esc(l.segmento) : ""}${l.rating ? ` · ${l.rating}★` : ""}</div>
+          <div>${l.whatsapp ? '<span class="selo wa">WA</span>' : ""}${!l.site_proprio ? '<span class="selo semsite">sem site</span>' : ""}${l.opt_out ? '<span class="selo">opt-out</span>' : ""}</div>
+        </div>`).join("")}
+    </div>`).join("");
+}
+let arrastando = null;
+function arrastar(ev, id) { arrastando = id; ev.dataTransfer.effectAllowed = "move"; }
+async function soltar(ev, etapa) {
+  ev.preventDefault();
+  ev.currentTarget.classList.remove("sobre");
+  if (!arrastando) return;
+  const id = arrastando; arrastando = null;
+  try { await api("leads/" + id, "PATCH", { etapa }); carregarFunil(); carregarPainel(); }
+  catch (e) { toast(e.message, true); carregarFunil(); }
+}
+
+/* ----------------------------- conversas --------------------------------- */
+const ROTULO_STATUS = { AGENDADO: "Agendada", ENVIADO: "Enviada", RESPONDEU: "Respondeu", EM_NEGOCIACAO: "Em negociação",
+  ASSUMIDO_HUMANO: "Com humano", SEM_RESPOSTA: "Sem resposta", ENCERRADO: "Encerrada", FALHOU: "Falhou" };
+async function carregarConversas() {
+  const filtro = $("#cv_filtro").value;
+  const linhas = await api("prospeccao/conversas" + (filtro ? "?status=" + filtro : ""));
+  $("#conversas-lista").innerHTML = linhas.map((c) => `
+    <div class="card clicavel" style="padding:.8rem 1rem;cursor:pointer" onclick="abrirConversa(${c.id})">
+      <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+        <div>
+          <b>${esc(c.nome)}</b> <span class="hint">${esc(c.cidade || "")}${c.uf ? "/" + esc(c.uf) : ""} · ${c.total_mensagens} msg</span>
+          <div class="hint" style="margin-top:.2rem">${esc((c.ultima_mensagem || "").slice(0, 90))}</div>
+        </div>
+        <div style="text-align:right;flex:none">
+          <span class="pill ${c.status === "RESPONDEU" || c.status === "EM_NEGOCIACAO" ? "ok" : c.status === "FALHOU" ? "err" : ""}">${ROTULO_STATUS[c.status] || c.status}</span>
+          <div class="hint" style="margin-top:.2rem">${c.ia_ligada ? "IA ativa" : "IA desligada"}</div>
+        </div>
+      </div>
+    </div>`).join("") || '<p class="hint">Nenhuma conversa ainda — agende um lote na aba Agendar.</p>';
+}
+async function abrirConversa(id) {
+  const r = await api("prospeccao/conversas/" + id);
+  conversaAberta = r.conversa;
+  $("#cv_titulo").textContent = r.conversa.nome;
+  $("#cv_sub").textContent = `${ROTULO_STATUS[r.conversa.status] || r.conversa.status} · IA ${r.conversa.ia_ligada ? "ativa" : "desligada"} · ${r.conversa.whatsapp || "sem zap"}`;
+  $("#cv_fio").innerHTML = r.mensagens.map((x) => `
+    <div class="balao ${x.direcao === "ENTRADA" ? "entrada" : "saida"}">${esc(x.corpo)}
+      <span class="quando">${x.direcao === "SAIDA" ? (x.via_ia ? "IA · " : "nós · ") : "empresa · "}${quando(x.criado_em)}</span>
+    </div>`).join("") || '<p class="hint">Sem mensagens ainda.</p>';
+  $("#modal-conversa").hidden = false;
+}
+async function acaoConversa(acao) {
+  try {
+    await api("prospeccao/conversas/" + conversaAberta.id, "PATCH", { acao });
+    toast("Feito!"); abrirConversa(conversaAberta.id); carregarConversas();
+  } catch (e) { toast(e.message, true); }
+}
+
+/* ------------------------------ agendar ---------------------------------- */
+let ELEGIVEIS = [];
+async function carregarElegiveis() {
+  const r = await api("prospeccao/elegiveis");
+  ELEGIVEIS = r.itens;
+  $("#ag_resumo").textContent = `${r.disponiveis} disponíveis de ${r.total}`;
+  $("#elegiveis-corpo").innerHTML = ELEGIVEIS.map((l) => `
+    <tr>
+      <td>${l.bloqueio ? "" : `<input type="checkbox" class="ag_sel" value="${l.id}">`}</td>
+      <td><b>${esc(l.nome)}</b>${!l.site_proprio ? ' <span class="selo semsite">sem site</span>' : ""}</td>
+      <td>${esc(l.cidade || "")}${l.uf ? "/" + esc(l.uf) : ""}</td>
+      <td>${esc(l.segmento || "")}</td>
+      <td>${l.bloqueio ? `<span class="pill warn">${esc(l.bloqueio)}</span>` : '<span class="pill ok">disponível</span>'}</td>
+    </tr>`).join("") || '<tr><td colspan="5" class="hint" style="padding:1rem">Nenhuma empresa com WhatsApp na base ainda.</td></tr>';
+  await carregarLotes();
+}
+function marcarTodas() {
+  const on = $("#ag_todas").checked;
+  document.querySelectorAll(".ag_sel").forEach((c) => { c.checked = on; });
+}
+async function agendarLote() {
+  const ids = [...document.querySelectorAll(".ag_sel:checked")].map((c) => Number(c.value));
+  if (!ids.length) return toast("Selecione ao menos uma empresa", true);
+  const quandoV = $("#ag_quando").value;
+  if (!quandoV) return toast("Escolha data e hora", true);
+  if (!confirm(`Agendar primeiro contato automático para ${ids.length} empresa(s)?`)) return;
+  try {
+    const r = await api("prospeccao/lotes", "POST", { leadIds: ids, quando: new Date(quandoV).toISOString(), nota: $("#ag_nota").value });
+    toast(`Lote criado: ${r.criados} tarefas` + (r.pulados.length ? ` (${r.pulados.length} puladas)` : ""));
+    carregarElegiveis(); carregarDiag();
+  } catch (e) { toast(e.message, true); }
+}
+async function carregarLotes() {
+  const lotes = await api("prospeccao/lotes");
+  $("#lotes-lista").innerHTML = lotes.map((l) => {
+    const t = l.tarefas;
+    const partes = Object.entries(t).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(" · ");
+    return `<div style="padding:.3rem 0;border-bottom:1px solid var(--line)">${quando(l.agendado_para)} — ${esc(l.nota || "sem nota")} · ${partes || "vazio"}</div>`;
+  }).join("") || "Nenhum lote ainda.";
+}
+
+/* ------------------------------ conexão ---------------------------------- */
+async function carregarCanal() {
+  const c = await api("prospeccao/canal");
+  const nome = { CONECTADO: '<span class="pill ok">✓ conectado</span>', AGUARDANDO_QR: '<span class="pill warn">aguardando QR</span>',
+    DESCONECTADO: '<span class="pill err">desconectado</span>' }[c.estado] || c.estado;
+  $("#cx_estado").innerHTML = `${nome} · worker ${c.workerVivo ? '<span class="pill ok">vivo</span>' : '<span class="pill err">fora do ar</span>'}` +
+    (c.telefone ? ` · número ${esc(c.telefone)}` : "") +
+    (c.ultimoErro ? `<br><span class="hint">${esc(c.ultimoErro)}</span>` : "");
+  $("#cx_qr").innerHTML = c.qrSvg ? `<div class="qr-box">${c.qrSvg}</div>` :
+    (c.estado === "AGUARDANDO_QR" ? '<p class="hint">QR gerado mas o pacote "qrcode" não está instalado no servidor — rode npm install.</p>' : "");
+}
+async function desconectarWa() {
+  if (!confirm("Desconectar o número atual? Será preciso escanear um QR novo.")) return;
+  try { await api("prospeccao/canal", "POST", { acao: "desconectar" }); toast("Pedido enviado ao worker"); }
+  catch (e) { toast(e.message, true); }
+}
+
+/* ------------------------------- config ---------------------------------- */
+async function carregarConfig() {
+  const c = await api("prospeccao/config");
+  $("#cf_teto_diario").value = c.tetoDiario; $("#cf_gap_min_seg").value = c.gapMinSeg; $("#cf_gap_max_seg").value = c.gapMaxSeg;
+  $("#cf_janela_inicio").value = c.janelaInicio; $("#cf_janela_fim").value = c.janelaFim;
+  $("#cf_fim_de_semana").checked = c.fimDeSemana;
+  $("#cf_ia_tom").value = c.tom; $("#cf_ia_roteiro").value = c.roteiro;
+  $("#cf_ia_modelo").value = c.modelo; $("#cf_base_url").value = c.baseUrl;
+  $("#cf_st_anthropic").textContent = c.anthropicConfigurada ? "✓ configurada" : "✕ falta configurar";
+  $("#cf_st_places").textContent = c.placesConfigurada ? "✓ configurada" : "✕ falta configurar";
+}
+async function salvarConfig() {
+  try {
+    await api("prospeccao/config", "PUT", {
+      teto_diario: Number($("#cf_teto_diario").value), gap_min_seg: Number($("#cf_gap_min_seg").value),
+      gap_max_seg: Number($("#cf_gap_max_seg").value), janela_inicio: Number($("#cf_janela_inicio").value),
+      janela_fim: Number($("#cf_janela_fim").value), fim_de_semana: $("#cf_fim_de_semana").checked,
+      ia_tom: $("#cf_ia_tom").value, ia_roteiro: $("#cf_ia_roteiro").value,
+      ia_modelo: $("#cf_ia_modelo").value, base_url: $("#cf_base_url").value,
+      anthropic_api_key: $("#cf_anthropic_api_key").value.trim(),
+      google_places_api_key: $("#cf_google_places_api_key").value.trim(),
+    });
+    $("#cf_anthropic_api_key").value = ""; $("#cf_google_places_api_key").value = "";
+    toast("Configuração salva!"); carregarConfig(); carregarDiag();
+  } catch (e) { toast(e.message, true); }
+}
+
+/* ------------------------------- senha ----------------------------------- */
+async function trocarSenha() {
+  try {
+    await api("senha", "POST", { atual: $("#sn_atual").value, nova: $("#sn_nova").value });
+    $("#sn_atual").value = $("#sn_nova").value = "";
+    toast("Senha alterada!");
+  } catch (e) { toast(e.message, true); }
+}
+
+boot();
+</script>
+</body>
+</html>

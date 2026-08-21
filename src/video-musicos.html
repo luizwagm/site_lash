@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>LA Software House — vídeo "Antes do palco" (músicos)</title>
+<!--
+  =========================================================================
+   VÍDEO DE CAMPANHA 9:16 — "O CACHÊ COMEÇA ANTES DO PALCO"
+   Reels, story e status do WhatsApp. 21 segundos.
+
+   COMO USAR
+   1. Abra este arquivo no navegador (duplo clique serve).
+   2. "Reproduzir" para revisar. "Gravar 21s" para exportar o arquivo.
+   3. Sai um .webm em 1080×1920, 30 fps. Importe no CapCut, ponha a trilha
+      (ver ROTEIRO abaixo) e exporte MP4 — o Instagram prefere MP4.
+
+   POR QUE .webm E NÃO .mp4 DIRETO: esta máquina não tem ffmpeg, então não há
+   como codificar H.264 aqui. O MediaRecorder do navegador é o único
+   codificador disponível, e ele entrega VP9/WebM. Qualquer editor importa.
+
+   AO GRAVAR, DEIXE ESTA ABA NA FRENTE: o requestAnimationFrame é
+   estrangulado em aba de fundo e o vídeo sai com engasgo.
+
+   ROTEIRO / TRILHA (o vídeo é mudo de propósito — som se resolve na edição):
+     0,0–2,6s   gancho digitado. Trilha entra baixa, só groove.
+     2,6–6,0s   a virada: "alguém já decidiu o seu cachê".
+     6,0–10,2s  a busca do contratante. Manter tensão, sem melodia.
+    10,2–16,4s  AS QUATRO VANTAGENS. É AQUI QUE O BEAT ABRE (drop).
+    16,4–18,2s  marca + 15 anos.
+    18,2–22,0s  oferta e telefone. Trilha sustenta e corta seca no fim.
+   Batida instrumental seca, 90–100 BPM. Nada com voz: voz na trilha disputa
+   com o texto na tela e o espectador não lê nem ouve.
+
+   TIPOGRAFIA: mesma pilha de reserva do gerador das estáticas
+   (src/gerar-campanha-musicos.ps1), para o vídeo e os banners não saírem com
+   letra diferente. Nada é buscado da rede — o vídeo tem de renderizar igual
+   offline.
+  =========================================================================
+-->
+<style>
+  :root {
+    --bg-900: #08080c; --bg-800: #0d0d14; --surface: #14141f;
+    --texto: #f3f4fb; --mudo: #9a9db1;
+    --violeta: #7c5cff; --ciano: #24e3d6;
+    --linha: rgba(255,255,255,.10);
+    --fonte: "Space Grotesk", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg-900); color: var(--texto);
+    font-family: var(--fonte); display: flex; gap: 28px; padding: 24px;
+    align-items: flex-start; justify-content: center; flex-wrap: wrap;
+  }
+  #palco { position: relative; }
+  canvas {
+    display: block; height: min(84vh, 900px); width: auto;
+    border: 1px solid var(--linha); border-radius: 14px; background: #000;
+  }
+  aside { width: 330px; max-width: 100%; }
+  h1 { font-size: 19px; margin: 0 0 4px; letter-spacing: -.2px; }
+  h1 span { background: linear-gradient(100deg, var(--violeta), var(--ciano));
+            -webkit-background-clip: text; background-clip: text; color: transparent; }
+  p, li { font-size: 13.5px; line-height: 1.6; color: var(--mudo); }
+  ol { padding-left: 18px; }
+  .botoes { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 8px; }
+  button {
+    font: 600 13px/1 var(--fonte); color: #09090f; cursor: pointer;
+    padding: 13px 18px; border: 0; border-radius: 999px;
+    background: linear-gradient(100deg, var(--violeta), var(--ciano));
+  }
+  button.vazio { background: transparent; color: var(--texto); border: 1px solid var(--linha); }
+  button:disabled { opacity: .45; cursor: default; }
+  #estado { font: 500 12.5px/1.5 var(--mono); color: var(--ciano); min-height: 34px; }
+  .nota { border-left: 2px solid var(--violeta); padding-left: 12px; margin-top: 18px; }
+  kbd { font: 600 11px/1 var(--mono); background: var(--surface); border: 1px solid var(--linha);
+        border-radius: 5px; padding: 3px 6px; color: var(--texto); }
+</style>
+</head>
+<body>
+
+<div id="palco"><canvas id="tela" width="1080" height="1920"></canvas></div>
+
+<aside>
+  <h1>Vídeo <span>“Antes do palco”</span></h1>
+  <p>1080×1920 · 22s · 30 fps · músicos, cantores e bandas</p>
+
+  <div class="botoes">
+    <button id="bPlay">Reproduzir</button>
+    <button id="bRec">Gravar 22s</button>
+    <button id="bStop" class="vazio">Parar</button>
+  </div>
+  <div id="estado">pronto</div>
+
+  <div class="nota">
+    <p><strong>Depois de gravar:</strong></p>
+    <ol>
+      <li>Importe o <kbd>.webm</kbd> no CapCut.</li>
+      <li>Trilha instrumental seca, 90–100 BPM, com abertura em <strong>9s</strong> —
+          é onde as vantagens entram.</li>
+      <li>Exporte MP4 1080×1920.</li>
+    </ol>
+    <p>Mantenha esta aba <strong>na frente</strong> durante a gravação: em aba de
+       fundo o navegador reduz a taxa de quadros e o vídeo engasga.</p>
+  </div>
+</aside>
+
+<script>
+/* ======================================================================
+   O vídeo é uma função do tempo: desenha(t) sabe pintar QUALQUER instante
+   sem depender do quadro anterior. É o que permite gravar, revisar e
+   recomeçar sem acumular estado — e o que torna o resultado idêntico em
+   máquina rápida ou lenta.
+   ====================================================================== */
+const W = 1080, H = 1920, DUR = 22.0;
+const M = 90;                                  // margem, igual à das estáticas
+const cv = document.getElementById('tela');
+const cx = cv.getContext('2d');
+
+const COR = {
+  bg900: '#08080c', bg800: '#0d0d14', surface: '#14141f',
+  texto: '#f3f4fb', mudo: '#9a9db1', violeta: '#7c5cff', ciano: '#24e3d6'
+};
+const FT   = '"Space Grotesk","Segoe UI Variable Display","Segoe UI",system-ui,sans-serif';
+const FMONO= '"JetBrains Mono","Cascadia Mono",Consolas,monospace';
+
+// alturas do símbolo da marca — o mesmo motivo das estáticas
+const ALTURAS = [20, 30, 26, 16], ALT_MAX = 30;
+
+const ZAP = '(81) 97101-0607';
+const VANTAGENS = [
+  { b: 'CACHÊ MAIOR',  m: 'press kit que corta a pechincha' },
+  { b: 'AGENDA CHEIA', m: 'quem contrata te acha no Google' },
+  { b: 'VENDA DIRETA', m: 'ingresso, camiseta e aula online' },
+  { b: 'MENOS DIRECT', m: 'o sistema responde preço e data' }
+];
+
+/* ------------------------------------------------------------------ apoio */
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const easeOut = p => 1 - Math.pow(1 - clamp(p, 0, 1), 3);
+const easeInOut = p => (p = clamp(p, 0, 1)) < .5 ? 4*p*p*p : 1 - Math.pow(-2*p + 2, 3)/2;
+
+// Progresso de 0 a 1 dentro de uma janela de tempo. Toda entrada de elemento
+// passa por aqui, então o ritmo do vídeo se lê nos números da timeline.
+const janela = (t, ini, dur) => easeOut((t - ini) / dur);
+
+// Entrada padrão: sobe 40px e acende. Repetida em tudo — é o que faz as seis
+// cenas parecerem o mesmo filme e não seis animações diferentes.
+function entra(t, ini, dur = .55, desloc = 40) {
+  const p = janela(t, ini, dur);
+  return { a: p, dy: (1 - p) * desloc };
+}
+function saida(t, ini, dur = .4) { return 1 - clamp((t - ini) / dur, 0, 1); }
+
+function arred(x, y, w, h, r) {
+  r = Math.min(r, w/2, h/2);
+  cx.beginPath();
+  cx.moveTo(x + r, y);
+  cx.arcTo(x + w, y, x + w, y + h, r);
+  cx.arcTo(x + w, y + h, x, y + h, r);
+  cx.arcTo(x, y + h, x, y, r);
+  cx.arcTo(x, y, x + w, y, r);
+  cx.closePath();
+}
+function gradMarca(x1, y1, x2, y2) {
+  const g = cx.createLinearGradient(x1, y1, x2, y2);
+  g.addColorStop(0, COR.violeta); g.addColorStop(1, COR.ciano); return g;
+}
+// Caixa-alta com entreletra. O canvas também não tem tracking: mesmo desenho
+// caractere por caractere do gerador das estáticas, para as duas peças
+// tratarem os rótulos em mono do mesmo jeito.
+function track(txt, x, y, vao) {
+  let cxs = x;
+  for (const c of txt) { cx.fillText(c, cxs, y); cxs += cx.measureText(c).width + vao; }
+  return cxs - x - vao;
+}
+function largTrack(txt, vao) {
+  let w = 0; for (const c of txt) w += cx.measureText(c).width + vao; return w - vao;
+}
+
+/* ------------------------------------------------------- fundo permanente */
+// Facho de palco: o gradiente da marca com função narrativa. A intensidade é
+// animada — o palco "acende" no começo e pulsa de leve no resto, o que dá
+// vida ao quadro sem precisar de elemento novo em cena.
+function fundo(t) {
+  const g = cx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, COR.bg800); g.addColorStop(1, COR.bg900);
+  cx.fillStyle = g; cx.fillRect(0, 0, W, H);
+
+  const acende = easeInOut(t / 1.1);
+  const pulso = 1 + .06 * Math.sin(t * 1.7);
+  const inten = acende * pulso;
+
+  cx.save();
+  cx.beginPath();
+  cx.moveTo(W * .24, -30); cx.lineTo(W * .56, -30);
+  cx.lineTo(W * 1.20, H * .80); cx.lineTo(-W * .12, H * .80);
+  cx.closePath();
+  const gf = cx.createLinearGradient(0, 0, 0, H * .80);
+  gf.addColorStop(0, `rgba(124,92,255,${.30 * inten})`);
+  gf.addColorStop(1, 'rgba(124,92,255,0)');
+  cx.fillStyle = gf; cx.fill();
+  cx.restore();
+
+  for (const [px, py, r, cor, a] of [
+    [W*.40, H*.03, W*.54, '124,92,255', .34],
+    [W*1.04, H*.58, W*.44, '36,227,214', .20]
+  ]) {
+    const gr = cx.createRadialGradient(px, py, 0, px, py, r);
+    gr.addColorStop(0, `rgba(${cor},${a * acende})`);
+    gr.addColorStop(1, `rgba(${cor},0)`);
+    cx.fillStyle = gr; cx.fillRect(0, 0, W, H);
+  }
+
+  cx.strokeStyle = 'rgba(255,255,255,.04)'; cx.lineWidth = 1;
+  for (let x = 0; x < W; x += 60) { cx.beginPath(); cx.moveTo(x, 0); cx.lineTo(x, H); cx.stroke(); }
+  for (let y = 0; y < H; y += 60) { cx.beginPath(); cx.moveTo(0, y); cx.lineTo(W, y); cx.stroke(); }
+}
+
+/* ------------------------------------------------------------- o emblema */
+function emblema(x, y, tam, alfa = 1) {
+  const u = tam / 64;
+  cx.save(); cx.globalAlpha = alfa;
+  cx.fillStyle = '#fff';
+  cx.fillRect(x + 6*u, y + 10*u, 7*u, 40*u);
+  cx.fillRect(x + 6*u, y + 44*u, 52*u, 6*u);
+  cx.fillStyle = gradMarca(x + 16*u, y, x + 60*u, y + 50*u);
+  for (let i = 0; i < 4; i++) {
+    const bh = ALTURAS[i] * u;
+    arred(x + (17 + i*11)*u, y + 44*u - bh, 8*u, bh, 2*u); cx.fill();
+  }
+  cx.restore();
+}
+function lockup(y, alfa) {
+  cx.save(); cx.globalAlpha = alfa;
+  emblema(M, y, 62);
+  cx.font = `700 38px ${FT}`; cx.textBaseline = 'alphabetic';
+  const yy = y + 42;
+  cx.fillStyle = COR.ciano; cx.fillText('LA', M + 78, yy);
+  const wLA = cx.measureText('LA').width;
+  cx.fillStyle = COR.texto; cx.fillText(' Software House', M + 78 + wLA, yy);
+  cx.restore();
+}
+
+/* ------------------------------------------------- equalizador (assinatura) */
+// Cresce da esquerda para a direita durante as vantagens e depois fica
+// "tocando": cada barra oscila em torno da própria altura. É o símbolo da
+// marca em movimento, não um enfeite genérico de áudio.
+function equalizador(y, alt, avanco, t) {
+  const bw = 22, n = Math.floor((900 + 18) / (bw + 18));
+  const vao = (900 - n * bw) / (n - 1), base = y + alt;
+  for (let i = 0; i < n; i++) {
+    const nasce = clamp((avanco * n - i) / 1.4, 0, 1);
+    if (nasce <= 0) continue;
+    const env = .50 + .50 * Math.abs(Math.sin((i + 1) * .62));
+    const toca = 1 + .22 * Math.sin(t * 5.2 + i * .8);
+    const bh = Math.max(8, alt * (ALTURAS[i % 4] / ALT_MAX) * env * easeOut(nasce) * toca);
+    const bx = M + i * (bw + vao);
+    cx.fillStyle = gradMarca(bx, base - bh, bx, base);
+    arred(bx, base - bh, bw, bh, 6); cx.fill();
+
+    const hr = Math.min(bh * .34, alt * .22);
+    const gr = cx.createLinearGradient(bx, base + 3, bx, base + 3 + hr);
+    gr.addColorStop(0, 'rgba(124,92,255,.26)'); gr.addColorStop(1, 'rgba(124,92,255,0)');
+    cx.fillStyle = gr; arred(bx, base + 3, bw, hr, 6); cx.fill();
+  }
+  cx.strokeStyle = `rgba(255,255,255,${.25 * clamp(avanco * 2, 0, 1)})`;
+  cx.lineWidth = 2;
+  cx.beginPath(); cx.moveTo(M, base); cx.lineTo(M + 900, base); cx.stroke();
+}
+
+/* ===================================================== CENAS
+   Cada cena é uma função de (t) já com o tempo LOCAL dela. A timeline vive
+   num só lugar, então mudar o ritmo do filme é mudar números aqui — não
+   mexer em seis funções de desenho.
+   ==================================================================== */
+//   A cena 3 nasceu com 3,4s e a medição mostrou o problema: a frase que
+//   FECHA o argumento ("ele vai decidir o seu valor com o que encontrar
+//   aqui") ficava em força total por menos de meio segundo, porque a
+//   digitação da busca comia o tempo dela. Duas linhas exigem mais de um
+//   segundo em tela. A cena passou para 4,2s e a digitação ficou mais rápida.
+const CENA = { s1: 0, s2: 2.6, s3: 6.0, s4: 10.2, s5: 16.4, s6: 18.2 };
+
+// ---- 1. o gancho, digitado. Os dois primeiros segundos decidem se alguém
+// assiste ao resto: por isso a frase começa a aparecer antes de meio segundo
+// e deixa a conclusão em suspenso.
+function cena1(t) {
+  const txt = 'ANTES DE VOCÊ SUBIR NO PALCO...';
+  const n = Math.floor(clamp((t - .45) / 1.5, 0, 1) * txt.length);
+  const alfa = saida(t, CENA.s2 - .35, .35);
+  cx.save(); cx.globalAlpha = alfa;
+  cx.font = `700 46px ${FMONO}`; cx.textBaseline = 'alphabetic';
+  cx.fillStyle = COR.ciano;
+  const w = track(txt.slice(0, n), M, H * .49, 3);
+  if (t % .8 < .45 && n < txt.length) { cx.fillRect(M + w + 8, H * .49 - 34, 20, 40); }
+  cx.restore();
+}
+
+// ---- 2. a virada. "CACHÊ" é a única palavra em gradiente do vídeo inteiro:
+// é a palavra do dinheiro, e marcar mais de uma destruiria o destaque.
+function cena2(t) {
+  const alfa = saida(t, CENA.s3 - CENA.s2 - .4, .4);
+  const linhas = [['ALGUÉM JÁ', null], ['DECIDIU O', null], ['SEU CACHÊ.', 'CACHÊ']];
+  cx.save(); cx.globalAlpha = alfa;
+  cx.font = `700 116px ${FT}`; cx.textBaseline = 'alphabetic';
+  linhas.forEach((par, i) => {
+    const e = entra(t, .10 + i * .20, .6, 54);
+    cx.save(); cx.globalAlpha = alfa * e.a;
+    const y = H * .34 + i * 126 + e.dy;
+    const [linha, dest] = par;
+    if (!dest) { cx.fillStyle = COR.texto; cx.fillText(linha, M, y); }
+    else {
+      const k = linha.indexOf(dest), antes = linha.slice(0, k), depois = linha.slice(k + dest.length);
+      cx.fillStyle = COR.texto; cx.fillText(antes, M, y);
+      const wa = cx.measureText(antes).width, wd = cx.measureText(dest).width;
+      cx.fillStyle = gradMarca(M + wa, y, M + wa + wd, y);
+      cx.fillText(dest, M + wa, y);
+      cx.fillStyle = COR.texto; cx.fillText(depois, M + wa + wd, y);
+    }
+    cx.restore();
+  });
+  cx.restore();
+}
+
+// ---- 3. a busca do contratante. Mostrar em vez de afirmar: a barra de
+// pesquisa É o argumento. Ninguém discute uma tela que já viu.
+function cena3(t) {
+  const alfa = saida(t, CENA.s4 - CENA.s3 - .45, .45);
+  cx.save(); cx.globalAlpha = alfa;
+
+  const e0 = entra(t, .05, .5, 30);
+  cx.globalAlpha = alfa * e0.a;
+  cx.font = `700 30px ${FMONO}`; cx.fillStyle = COR.ciano; cx.textBaseline = 'alphabetic';
+  track('ELE PESQUISA VOCÊ PRIMEIRO', M, H * .30 + e0.dy, 2.6);
+
+  // a barra
+  const e1 = entra(t, .35, .55, 40);
+  cx.globalAlpha = alfa * e1.a;
+  const by = H * .36 + e1.dy, bh = 132;
+  cx.fillStyle = 'rgba(20,20,31,.92)'; arred(M, by, 900, bh, 26); cx.fill();
+  cx.strokeStyle = 'rgba(255,255,255,.14)'; cx.lineWidth = 2; cx.stroke();
+  // lupa
+  cx.strokeStyle = COR.mudo; cx.lineWidth = 6;
+  cx.beginPath(); cx.arc(M + 62, by + bh/2 - 4, 22, 0, Math.PI*2); cx.stroke();
+  cx.beginPath(); cx.moveTo(M + 78, by + bh/2 + 12); cx.lineTo(M + 94, by + bh/2 + 28); cx.stroke();
+
+  const busca = 'cantor para casamento em caruaru';
+  const n = Math.floor(clamp((t - .85) / 1.15, 0, 1) * busca.length);
+  cx.font = `400 42px ${FT}`; cx.fillStyle = COR.texto;
+  cx.fillText(busca.slice(0, n), M + 118, by + bh/2 + 15);
+  if (t % .8 < .45) {
+    const w = cx.measureText(busca.slice(0, n)).width;
+    cx.fillStyle = COR.ciano; cx.fillRect(M + 122 + w, by + bh/2 - 21, 4, 44);
+  }
+
+  // o veredicto
+  const e2 = entra(t, 2.05, .6, 34);
+  cx.globalAlpha = alfa * e2.a;
+  cx.font = `400 44px ${FT}`; cx.fillStyle = COR.mudo;
+  cx.fillText('Ele vai decidir o seu valor', M, H * .49 + e2.dy);
+  cx.fillText('com o que encontrar aqui.', M, H * .49 + 62 + e2.dy);
+  cx.restore();
+}
+
+// ---- 4. as vantagens, uma por vez, com o equalizador se construindo junto.
+// Lista vertical (e não a grade 2×2 das estáticas) porque no vídeo a entrada
+// é SEQUENCIAL: cada benefício ganha o quadro sozinho por um instante.
+function cena4(t) {
+  const alfa = saida(t, CENA.s5 - CENA.s4 - .45, .45);
+  cx.save(); cx.globalAlpha = alfa;
+  VANTAGENS.forEach((v, i) => {
+    const e = entra(t, .15 + i * .95, .6, 46);
+    if (e.a <= 0) return;
+    cx.save(); cx.globalAlpha = alfa * e.a;
+    const y = 560 + i * 218 + e.dy;
+    cx.fillStyle = gradMarca(M, y - 58, M, y + 6);
+    arred(M, y - 56, 10, 64, 5); cx.fill();
+    cx.font = `700 74px ${FT}`; cx.fillStyle = COR.texto; cx.textBaseline = 'alphabetic';
+    cx.fillText(v.b, M + 38, y);
+    cx.font = `400 36px ${FT}`; cx.fillStyle = COR.mudo;
+    cx.fillText(v.m, M + 38, y + 54);
+    cx.restore();
+  });
+  cx.restore();
+}
+
+// ---- 5. a marca. Só aqui ela cresce: antes disso quem rola o feed não para
+// por causa do logo de um fornecedor, para por causa da promessa.
+function cena5(t) {
+  const alfa = saida(t, CENA.s6 - CENA.s5 - .4, .4);
+  cx.save(); cx.globalAlpha = alfa;
+  const e = entra(t, .05, .6, 44);
+  cx.globalAlpha = alfa * e.a;
+  emblema(M, H * .38 + e.dy, 124);
+  cx.font = `700 76px ${FT}`; cx.textBaseline = 'alphabetic';
+  const y = H * .38 + 168 + e.dy;
+  cx.fillStyle = COR.ciano; cx.fillText('LA', M, y);
+  const w = cx.measureText('LA').width;
+  cx.fillStyle = COR.texto; cx.fillText(' Software House', M + w, y);
+
+  const e2 = entra(t, .5, .6, 30);
+  cx.globalAlpha = alfa * e2.a;
+  cx.font = `700 32px ${FMONO}`; cx.fillStyle = COR.mudo;
+  track('15 ANOS CONSTRUINDO SOFTWARE', M, y + 76 + e2.dy, 2.4);
+  cx.restore();
+}
+
+// ---- 6. a oferta e o telefone. O selo pulsa porque é o único elemento que
+// pede AÇÃO — movimento aqui tem função, não enfeite.
+function cena6(t) {
+  const e = entra(t, .05, .6, 44);
+  cx.save(); cx.globalAlpha = e.a;
+
+  cx.font = `700 34px ${FMONO}`; cx.textBaseline = 'alphabetic';
+  const txt = 'ANÁLISE GRATUITA DO SEU PERFIL';
+  const wt = largTrack(txt, 2.4), pw = wt + 104, ph = 96;
+  // Descido de 0,40 para 0,47 da altura: em 0,40 sobravam 450px de vazio
+  // entre o endereço e o equalizador, e o bloco de ação ficava solto no meio
+  // do quadro. Aqui ele se apoia na faixa, com a marca no topo fechando a
+  // composição em três apoios.
+  const py = H * .47 + e.dy, esc = 1 + .022 * Math.sin(t * 5);
+  cx.save();
+  cx.translate(M + pw/2, py + ph/2); cx.scale(esc, esc); cx.translate(-(M + pw/2), -(py + ph/2));
+  cx.fillStyle = gradMarca(M, py, M + pw, py + ph);
+  arred(M, py, pw, ph, ph/2); cx.fill();
+  cx.fillStyle = '#09090f'; track(txt, M + 52, py + ph/2 + 12, 2.4);
+  cx.restore();
+
+  const e2 = entra(t, .45, .6, 36);
+  cx.globalAlpha = e2.a;
+  cx.font = `700 32px ${FMONO}`; cx.fillStyle = COR.ciano;
+  track('CHAME NO WHATSAPP', M, py + 190 + e2.dy, 2.6);
+  cx.font = `700 92px ${FT}`; cx.fillStyle = COR.texto;
+  cx.fillText(ZAP, M, py + 300 + e2.dy);
+  cx.font = `400 40px ${FT}`; cx.fillStyle = '#c6c9d8';
+  cx.fillText('luizaugust.me', M, py + 370 + e2.dy);
+  cx.restore();
+}
+
+/* ------------------------------------------------------------ o desenho */
+function desenha(t) {
+  t = clamp(t, 0, DUR);
+  fundo(t);
+
+  // marca discreta no topo a partir da 2ª cena, e o equalizador do rodapé a
+  // partir da 4ª — os dois ficam até o fim, costurando as cenas.
+  // A marca discreta no topo entra na 2ª cena e sai na 5ª — porque na 5ª ela
+  // É o assunto, em tamanho grande, e repetir seria redundância. Volta na 6ª:
+  // o quadro do telefone é o que mais fica em tela e o que mais é
+  // "screenshotado" — nele o espectador tem de ver DE QUEM é o número.
+  const nasceEm = t >= CENA.s6 ? CENA.s6 : (t >= CENA.s2 && t < CENA.s5 ? CENA.s2 : null);
+  if (nasceEm !== null) lockup(H * .075, clamp((t - nasceEm) / .8, 0, 1) * .9);
+  if (t >= CENA.s4) {
+    const avanco = clamp((t - CENA.s4 - .2) / 2.6, 0, 1);
+    equalizador(H * .845, 128, avanco, t);
+  }
+
+  if (t < CENA.s2)      cena1(t - CENA.s1);
+  else if (t < CENA.s3) cena2(t - CENA.s2);
+  else if (t < CENA.s4) cena3(t - CENA.s3);
+  else if (t < CENA.s5) cena4(t - CENA.s4);
+  else if (t < CENA.s6) cena5(t - CENA.s5);
+  else                  cena6(t - CENA.s6);
+}
+
+/* ------------------------------------------------------- reprodução */
+let laco = null, t0 = 0, gravador = null;
+const est = document.getElementById('estado');
+const bPlay = document.getElementById('bPlay');
+const bRec  = document.getElementById('bRec');
+const bStop = document.getElementById('bStop');
+
+function toca(aoFim) {
+  cancelaLaco();
+  t0 = performance.now();
+  const passo = () => {
+    const t = (performance.now() - t0) / 1000;
+    desenha(t);
+    if (t >= DUR) { laco = null; if (aoFim) aoFim(); return; }
+    est.textContent = `${t.toFixed(1)}s / ${DUR.toFixed(1)}s`;
+    laco = requestAnimationFrame(passo);
+  };
+  laco = requestAnimationFrame(passo);
+}
+function cancelaLaco() { if (laco) cancelAnimationFrame(laco); laco = null; }
+
+bPlay.onclick = () => { est.textContent = 'reproduzindo'; toca(() => est.textContent = 'fim'); };
+bStop.onclick = () => {
+  cancelaLaco();
+  if (gravador && gravador.state === 'recording') gravador.stop();
+  est.textContent = 'parado';
+};
+
+bRec.onclick = () => {
+  // captureStream(30) fixa a taxa: sem isso o arquivo herda o refresh do
+  // monitor e sai com duração e cadência imprevisíveis.
+  const fluxo = cv.captureStream(30);
+  const tipos = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  const tipo = tipos.find(x => MediaRecorder.isTypeSupported(x));
+  if (!tipo) { est.textContent = 'ERRO: navegador sem MediaRecorder de webm'; return; }
+
+  const pedacos = [];
+  gravador = new MediaRecorder(fluxo, { mimeType: tipo, videoBitsPerSecond: 12e6 });
+  gravador.ondataavailable = ev => { if (ev.data.size) pedacos.push(ev.data); };
+  gravador.onstop = () => {
+    const blob = new Blob(pedacos, { type: 'video/webm' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'la-antes-do-palco-1080x1920.webm';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    est.textContent = `salvo · ${(blob.size/1048576).toFixed(1)} MB · importe no CapCut`;
+    bRec.disabled = bPlay.disabled = false;
+  };
+
+  bRec.disabled = bPlay.disabled = true;
+  est.textContent = 'GRAVANDO — não troque de aba';
+  gravador.start();
+  // meio segundo de folga no fim: o codificador precisa receber o último
+  // quadro antes do stop, senão o arquivo perde o corte final.
+  toca(() => setTimeout(() => gravador.stop(), 500));
+};
+
+desenha(0.9);   // quadro de abertura já com o facho aceso, não a tela preta
+</script>
+</body>
+</html>

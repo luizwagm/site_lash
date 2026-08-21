@@ -1,0 +1,40 @@
+# ==========================================================================
+#  lash-prospector.service — worker do WhatsApp da prospecção (/restrito)
+#
+#  Processo SEPARADO do site (lash.service) de propósito: o Baileys mantém
+#  uma conexão viva com o WhatsApp e pode cair/reconectar sem derrubar o
+#  site junto. Os dois conversam só pelo banco data/gestao.db.
+#
+#  Instalar (depois do lash.service já estar no ar):
+#    sudo cp lash-prospector.service /etc/systemd/system/
+#    sudo systemctl daemon-reload
+#    sudo systemctl enable --now lash-prospector
+#
+#  O QR de pareamento aparece em /restrito → Prospecção → Conexão.
+#
+#  ATENÇÃO: sem MemoryDenyWriteExecute aqui — essa trava mata o V8 com
+#  SIGTRAP segundos depois de subir (aprendido em outro projeto da frota).
+# ==========================================================================
+[Unit]
+Description=LA Software House — prospector (WhatsApp da gestão)
+After=network.target lash.service
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/var/www/projetos/LA-Software-House
+ExecStart=/usr/bin/node prospector.js
+Restart=always
+RestartSec=5
+StartLimitBurst=5
+Environment=NODE_ENV=production
+
+# Endurecimento — o mesmo do lash.service
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/www/projetos/LA-Software-House
+
+[Install]
+WantedBy=multi-user.target

@@ -7,6 +7,7 @@ arquivo pelo botão **Publicar**.
 - **Domínio:** luizaugust.me · **Porta interna:** 5180 · **Serviço:** `lash.service`
 - **Stack:** Node puro (`node:http`) + SQLite via **better-sqlite3**. Exige **Node ≥ 20**.
 - **Painel:** `/admin/` — senha inicial `la-admin` (**troque antes de divulgar o site**).
+- **Gestão da agência:** `/restrito/` — leads, funil e prospecção (ver seção própria).
 
 ## Como o conteúdo funciona
 
@@ -24,6 +25,40 @@ arquivo pelo botão **Publicar**.
 O menu do painel segue as seções do site: Publicar, Topo (Hero), Tecnologias,
 Serviços, Projetos, Processo, Diferenciais, Depoimentos, FAQ, Contato, Rodapé,
 Senha.
+
+## Gestão da agência (/restrito)
+
+Área logada SEPARADA do painel de conteúdo, para a operação comercial. A
+mecânica veio do bot de representação (jeans_hunter), generalizada para
+qualquer segmento. Código em `restrito.js` + `restrito/app.html`; banco
+próprio em `data/gestao.db` (WAL — dois processos escrevem nele).
+
+- **Login inicial:** `contato@luizaugust.me` / `la-restrito` (**troque na aba Senha**).
+- **Leads:** captação pelo Google Places (qualquer nicho + cidade — a flag
+  "sem site próprio" é o gancho de venda), cadastro manual, filtros, histórico
+  de contato por lead e mensagem de 1º contato escrita pela IA para enviar
+  pelo `wa.me`.
+- **Funil (11 etapas):** kanban com arrastar-e-soltar; a automação espelha o
+  status da conversa no funil, mas **nunca rebaixa** etapa marcada por humano.
+- **Prospecção automática:** lotes de primeiro contato + follow-ups em
+  24h/48h/72h/5d, teto diário (só conta envio da IA), janela de horário no
+  fuso do negócio, intervalo aleatório de 45–180s entre envios, opt-out
+  respeitado em todos os caminhos. **O kill-switch nasce DESLIGADO.**
+- **IA vendedora:** responde as empresas com saída estruturada; nunca escreve
+  URL (marca `[LINK]` e o código resolve para o site/case do portfólio; link
+  externo derruba a mensagem); quem fala em fechar/valores/prazo vai para
+  humano; quem pede para parar vira opt-out.
+- **Worker do WhatsApp:** `node prospector.js` (processo separado, Baileys —
+  dependência opcional). QR de pareamento aparece em Prospecção → Conexão.
+  `node prospector.js --seco` roda o motor sem enviar nada (teste).
+  Em produção: `sudo cp lash-prospector.service /etc/systemd/system/ &&
+  sudo systemctl enable --now lash-prospector` (e atualizar o
+  `/etc/sudoers.d/lash` com o `ci/sudoers-lash` novo, senão o deploy não
+  consegue parar/subir o worker).
+- **Chaves de API** (Anthropic para a IA, Google Places para a captação):
+  em Prospecção → Config. A chave gravada nunca volta ao navegador.
+- O `gestao.db` entra no mesmo backup diário do `site.db` e no cofre do
+  `deploy.sh`.
 
 ## Subir pela primeira vez
 

@@ -19,6 +19,9 @@ const crypto = require("node:crypto");
 const { execSync } = require("node:child_process");
 const { abrirBanco, DRIVER_NOME, DRIVER_AVISO } = require("./db");
 const { agendarBackups, rodarBackup, statusBackup } = require("./backup");
+/* Gestão da agência (/restrito): leads, funil, prospecção por WhatsApp e IA.
+   Módulo separado com banco próprio (data/gestao.db) — ver restrito.js. */
+const { handleRestrito, SISTEMA_VERSION, GESTAO_DB } = require("./restrito");
 
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT) || 5180;   // PORT por env permite subir cópia de teste
@@ -26,7 +29,7 @@ const PORT = Number(process.env.PORT) || 5180;   // PORT por env permite subir c
    REGRA: feature nova sobe a 2ª casa (1.3.0, 1.4.0… pode passar de 10);
    correção de bug sobe a 3ª (1.4.1, 1.4.2…, também sem teto).
    A 1ª casa não muda. */
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.7.0";
 const UPLOAD_DIR = path.join(ROOT, "assets", "img", "uploads");
 fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -539,6 +542,11 @@ const server = http.createServer(async (req, res) => {
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
 
   try {
+    /* ----------------------------- /restrito ------------------------------ */
+    /* ANTES dos estáticos, de propósito: sem esta interceptação, o
+       restrito/app.html seria servido como arquivo comum, sem login. */
+    if (handleRestrito(req, res, p)) return;
+
     /* ------------------------------ API ---------------------------------- */
     if (p.startsWith("/api/")) {
       if (p === "/api/login" && req.method === "POST") {
@@ -681,7 +689,9 @@ const server = http.createServer(async (req, res) => {
        público. Antes a lista citava `server.js` nominalmente e, ao surgirem
        db.js, backup.js e build.js, os três passaram a ser baixáveis — um
        bloqueio que precisa ser lembrado a cada arquivo novo já nasce furado. */
-    const dirProibido = /^\/(data|src|node_modules|nginx|backups)(\/|$)/.test(p);
+    /* `restrito` na lista é cinto e suspensório: o handleRestrito já
+       intercepta tudo que começa com /restrito antes de chegar aqui. */
+    const dirProibido = /^\/(data|src|node_modules|nginx|backups|restrito)(\/|$)/.test(p);
     const ocultoProibido = /(^|\/)\.[^/]/.test(p);                       // .git, .env, dotfiles
     const extProibida = /\.(db|sqlite3?|sh|bash|service|env|conf|ini|sql|log|bak|old|orig|swp|tmp|pem|key|crt|lock|md)$/i.test(p);
     const jsDeServidor = /\.js$/i.test(p) && !/^\/assets\/js\//i.test(p); // JS público mora em /assets/js/
@@ -723,7 +733,8 @@ if (process.argv.includes("--publicar")) {
    `node server.js --backup`, para que as duas gravem no mesmo lugar. */
 const BACKUP_CFG = {
   destino: path.join(ROOT, "backups"),
-  bancos: [path.join(ROOT, "data", "site.db")],
+  // gestao.db é a carteira de leads/conversas do /restrito — mesmo ciclo diário
+  bancos: [path.join(ROOT, "data", "site.db"), GESTAO_DB],
   intervaloHoras: Number(process.env.BACKUP_HORAS) || 24,
   manter: Number(process.env.BACKUP_MANTER) || 30,
 };
@@ -739,8 +750,9 @@ if (process.argv.includes("--backup-status")) {
 
 server.listen(PORT, process.env.HOST || "127.0.0.1", () => {
   console.log(`\n  LA Software House — site + gerenciador v${APP_VERSION}`);
-  console.log(`  · Site:   http://localhost:${PORT}/`);
-  console.log(`  · Painel: http://localhost:${PORT}/admin/`);
+  console.log(`  · Site:    http://localhost:${PORT}/`);
+  console.log(`  · Painel:  http://localhost:${PORT}/admin/`);
+  console.log(`  · Gestão:  http://localhost:${PORT}/restrito/  (v${SISTEMA_VERSION} — worker: node prospector.js)`);
   console.log(`  · Banco:  ${DRIVER_NOME}${DRIVER_AVISO ? " ⚠ " + DRIVER_AVISO : ""}`);
   agendarBackups(BACKUP_CFG);
 

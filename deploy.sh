@@ -91,7 +91,12 @@ restaurar_e_sair() {
     mkdir -p data && cp "$BACKUP" data/site.db
     amarelo "Banco restaurado do backup: $BACKUP"
   fi
+  if [ -f "$COFRE/gestao.db" ]; then
+    mkdir -p data && cp "$COFRE/gestao.db" data/gestao.db
+    amarelo "Banco da gestão devolvido do cofre."
+  fi
   $SC start "$SERVICO" 2>/dev/null
+  $SC start lash-prospector.service 2>/dev/null
   rm -rf "$COFRE"
   exit 1
 }
@@ -120,6 +125,9 @@ echo "     $ANTES"
 # ------------------------------------------------------------ 3. parar
 azul "3/9  Parando o serviço"
 $SC stop "$SERVICO" 2>/dev/null
+# O prospector escreve no data/gestao.db — mexer no banco com ele vivo
+# perderia escrita. Se a unit não existe/não está autorizada, segue o jogo.
+$SC stop lash-prospector.service 2>/dev/null
 sleep 1
 verde "     parado (o SQLite solta o arquivo antes de mexermos nele)"
 
@@ -129,6 +137,10 @@ mkdir -p "$COFRE"
 [ -f data/site.db ] && mv data/site.db "$COFRE/site.db"
 for wal in data/site.db-wal data/site.db-shm; do
   [ -f "$wal" ] && mv "$wal" "$COFRE/$(basename "$wal")"
+done
+# gestao.db é a carteira de leads do /restrito — mesma proteção do site.db
+for g in data/gestao.db data/gestao.db-wal data/gestao.db-shm; do
+  [ -f "$g" ] && mv "$g" "$COFRE/$(basename "$g")"
 done
 [ -d assets/img/uploads ] && cp -r assets/img/uploads "$COFRE/uploads"
 verde "     guardados em $COFRE"
@@ -193,6 +205,9 @@ mkdir -p data assets/img/uploads
 for wal in site.db-wal site.db-shm; do
   [ -f "$COFRE/$wal" ] && mv "$COFRE/$wal" "data/$wal"
 done
+for g in gestao.db gestao.db-wal gestao.db-shm; do
+  [ -f "$COFRE/$g" ] && mv "$COFRE/$g" "data/$g"
+done
 [ -d "$COFRE/uploads" ] && cp -rn "$COFRE/uploads/." assets/img/uploads/ 2>/dev/null
 
 # O dono precisa ser o usuário do serviço, não um palpite: com o dono errado o
@@ -205,9 +220,11 @@ GRUPO=$($SC show "$SERVICO" -p Group --value 2>/dev/null); [ -z "$GRUPO" ] && GR
 if [ "$SOU_ROOT" = "1" ]; then chown -R "$DONO:$GRUPO" data assets/img/uploads backups 2>/dev/null; fi
 chmod 755 data assets/img/uploads 2>/dev/null
 [ -f data/site.db ] && chmod 644 data/site.db
+[ -f data/gestao.db ] && chmod 644 data/gestao.db
 verde "     de volta no lugar (dono: $DONO:$GRUPO)"
 
 $SC start "$SERVICO"
+$SC start lash-prospector.service 2>/dev/null
 sleep 3
 
 # -------------------------------------------------------- 8. publicar

@@ -26,6 +26,12 @@ deploy ALL=(root) NOPASSWD: /usr/bin/systemctl start lash.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl stop lash.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart lash.service
 
+# O prospector (worker do WhatsApp do /restrito) para e sobe junto no deploy —
+# ele escreve no data/gestao.db, e mexer no banco com ele vivo perderia escrita.
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl start lash-prospector.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl stop lash-prospector.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart lash-prospector.service
+
 # Leitura: o deploy usa para descobrir o dono do serviço e conferir se subiu.
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active lash.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl show lash.service -p User --value
